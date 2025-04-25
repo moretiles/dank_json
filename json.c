@@ -43,9 +43,12 @@ int json_lib_init(){
  * Init pool
  */
 int init_pool(struct json_pool *pool){
+    if(pool == NULL){
+        return 1;
+    }
 	struct json_element **storage = malloc(sizeof(struct json_pool) * 1024 * 1024);
 	if (storage == NULL){
-		return 1;
+		return 2;
 	}
 	pool->items = storage;
 	pool->stored = 0;
@@ -58,7 +61,7 @@ int init_pool(struct json_pool *pool){
  * Destroy element
  */
 struct json_element *destroy_element(struct json_pool *pool, struct json_element *elem){
-	if(!elem || elem->type == META_FREE){
+	if(!pool || !elem || elem->type == META_FREE){
 		return NULL;
 	}
 
@@ -118,7 +121,7 @@ int array_destroy_element(struct json_pool *pool, struct json_element *array, st
 	/* 
 	 * It should always be the case that if prev exists then next exists and vice versa
 	 */
-	if(!array || !elem || array->type != JSON_ARRAY){
+	if(!pool || !array || !elem || array->type != JSON_ARRAY){
 		return 1;
 	}
 
@@ -144,18 +147,29 @@ int array_destroy_element(struct json_pool *pool, struct json_element *array, st
 }
 
 struct json_element *array_get_nth(struct json_element *array, size_t n){
+    if(array == NULL){
+        return NULL;
+    }
 	struct json_element *elem = array; 
 	while(n > 0 && elem){
 		n--;
 		elem = elem->next;
 	}
-	return elem;
+    if(n > 0){
+        return NULL;
+    } else {
+	    return elem;
+    }
 }
 
 /*
  * Destroy pool
  */
 int destroy_pool(struct json_pool *pool){
+    if(pool == NULL){
+        return 1;
+    }
+
 	size_t i = 0;
 	for(i = 0; i < pool->cap; i++){
 		destroy_element(pool, (pool->items)[i]);
@@ -167,6 +181,10 @@ int destroy_pool(struct json_pool *pool){
  * New element
  */
 struct json_element *new_element(struct json_pool *pool){
+    if(pool == NULL){
+        return NULL;
+    }
+
 	struct json_element *now_taken = NULL;
 	if(pool->next_free){
 		now_taken = pool->next_free;
@@ -190,13 +208,14 @@ static inline int is_whitespace(char c) {
 }
 
 void get_next(char *outer, struct queue *store) {
+	if (outer == NULL || store == NULL){
+		return;
+	}
 	strcpy(outer, "");
 	char c = ' ';
 	size_t read_in = 0;
 	//char outer[999] = "";
-	if (store == NULL){
-		return;
-	}
+
 	while (is_whitespace(c)) {
 		//printf("whitespace found %c\n", c);
 		dequeuec(store, &c);
@@ -260,7 +279,7 @@ int is_json_num(char *str) {
 	for(i = 0; i < strlen(str); i++){
 		c = str[i];
 		if (c == '-' || c == '+'){
-			if (!(i <= 0) && !(str[i - 1] == 'e' || str[i - 1] == 'E')){
+			if (i != 0 && str[i - 1] != 'e' && str[i - 1] != 'E'){
 				return false;
 			}
 		}
@@ -408,6 +427,11 @@ struct json_element *get_json_array(FILE *file) {
 	struct json_element *new_array;
 	struct json_element current;
 	char sep = ',', error = 0;
+
+    if(file == NULL){
+        return NULL;
+    }
+
 	while(!error && sep != ']'){
        		get_next(scratch.chars, &read);
 		//printf("%s\n", scratch.chars);
@@ -437,7 +461,15 @@ struct json_element *get_json_object(FILE *file) {
 }
 
 union json_union process(FILE *file, enum json_type type, char *fragment) {
-	union json_union value;
+    union json_union value;
+    /*
+     * Might need to rethink how I handle get_next and process because right now
+     * it is not possible to return an error saying an attempt to process failed.
+    if(file == NULL || fragment == NULL){
+        return NULL;
+    }
+    */
+
 	switch(type){
 		case JSON_LITERAL:
 			value.l = get_json_literal(fragment);
