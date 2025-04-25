@@ -1,4 +1,4 @@
-# Small C library for parsing json
+# C library for parsing json
 
 * Not currently finished.
-* Scope of project is small.
+* Scope of project is limited.
