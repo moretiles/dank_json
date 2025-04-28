@@ -155,7 +155,7 @@ static inline int is_json_array(char *str);
 
 static inline int is_json_object(char *str);
 
-struct json_element identify(char *str);
+int identify(char *str, struct json_element *elem);
 
 enum json_literal get_json_literal(const char *ptr);
 
