@@ -103,6 +103,7 @@ struct json_pool {
 	size_t stored;
 	size_t cap;
 	struct json_element *next_free;
+    struct json_pool *prev;
 };
 
 int json_lib_init();
@@ -110,7 +111,7 @@ int json_lib_init();
 /*
  * Init pool
  */
-int init_pool(struct json_pool *pool);
+int init_pool(struct json_pool *pool, size_t size);
 
 /*
  * Destroy element
