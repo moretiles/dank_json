@@ -11,7 +11,7 @@ struct queue scratch;
 struct json_pool *elems;
 
 int json_lib_init(){
-	char *ptr = NULL;
+	void *ptr = NULL;
 	/*
 	 * Maybe check env variables for max sizes
 	 */
@@ -37,10 +37,11 @@ int json_lib_init(){
 	scratch.pos = 0;
 	scratch.cap = 8 * 1024 * 1024;
 
-    ptr = malloc(sizeof(struct json_pool));
+    ptr = calloc(sizeof(struct json_pool), 1);
     if(!ptr){
         return 4;
     }
+    elems = ptr;
     init_pool(elems, 1024 * 1024);
 
 	return 0;
@@ -60,7 +61,7 @@ int init_pool(struct json_pool *pool, size_t size){
         return 1;
     }
 
-	struct json_element **storage = malloc(sizeof(struct json_pool) * size);
+	struct json_element *storage = calloc(sizeof(struct json_pool), size);
 	if (storage == NULL){
 		return 2;
 	}
@@ -83,13 +84,17 @@ int destroy_pool(struct json_pool *pool){
 
 	size_t i = 0;
 	for(i = 0; i < pool->cap; i++){
-		destroy_element(pool, (pool->items)[i]);
+		destroy_element(pool, &((pool->items)[i]));
 	}
+    free(pool->items);
+
+    free(pool);
+
 	return 0;
 }
 
 struct json_pool *double_pool(struct json_pool **pool){
-        struct json_pool *ptr = malloc(sizeof(struct json_pool));
+        struct json_pool *ptr = calloc(sizeof(struct json_pool), 1);
 
         if(!ptr){
             return NULL;
@@ -435,14 +440,16 @@ char *get_json_str(struct queue *read, struct queue *scratch) {
 		}
 	}
 
-	ret = malloc(sizeof(char) * (scratch->pos + 1));
+	ret = malloc(scratch->pos + 1);
 	if (ret == NULL){
 		return NULL;
 	}
 	strncpy(ret, scratch->chars, scratch->pos);
+    ret[scratch->pos] = '\0';
 
 	scratch->base = 0;
 	scratch->pos = 0;	
+    printf("%p\n", ret);
 	return ret;
 }
 
@@ -469,11 +476,11 @@ struct json_element *get_json_array(FILE *file) {
        	get_next(scratch.chars, &read);
 		//printf("%s\n", scratch.chars);
 		current = identify(scratch.chars);
-		current.contents = process(file, current.type, scratch.chars);
+		process(file, &current, scratch.chars);
 		/*
 		Allocate new element from pool;
 		*/
-		array_add_element(new_array, pool_element);
+		array_add_element(new_array, &current);
 
 		sep = get_sep(&read);
 	}
@@ -493,38 +500,38 @@ struct json_element *get_json_object(FILE *file) {
 	return NULL;
 }
 
-union json_union process(FILE *file, enum json_type type, char *fragment) {
-    union json_union value;
+struct json_element *process(FILE *file, struct json_element *elem, char *fragment) {
     /*
      * Might need to rethink how I handle get_next and process because right now
      * it is not possible to return an error saying an attempt to process failed.
+    */
     if(file == NULL || fragment == NULL){
         return NULL;
     }
-    */
 
-	switch(type){
+	switch(elem->type){
 		case JSON_LITERAL:
-			value.l = get_json_literal(fragment);
+			elem->contents.l = get_json_literal(fragment);
 			break;
 		case JSON_STR:
-			value.s = get_json_str(&read, &scratch);
+			elem->contents.s = get_json_str(&read, &scratch);
 			break;
 		case JSON_NUM:
-			value.d = get_json_num(fragment);
-			//sscanf(fragment, "%le", &(value.d));
+			elem->contents.d = get_json_num(fragment);
+			//sscanf(fragment, "%le", &(elem.d));
 			break;
 		case JSON_ARRAY:
-			value.a = get_json_array(file);
+			elem->contents.a = get_json_array(file);
 			break;
 		case JSON_OBJECT:
-			value.o = get_json_object(file);
+			elem->contents.o = get_json_object(file);
 			break;
 		default:
 			/* print_error_messages_to_stderr(); */
 			break;
 	}
-	return value;
+    
+    return elem;
 }
 
 void tests(){
@@ -609,13 +616,17 @@ int main() {
 //	printf("%s\n", outer);
 //	get_next(outer, actual_json);	
 //	printf("%s\n", outer);
-       	get_next(scratch.chars, &read);
+    get_next(scratch.chars, &read);
 	printf("%s\n", scratch.chars);
 	struct json_element root = identify(scratch.chars);
-	root.contents = process(actual_json, root.type, scratch.chars);
+	process(actual_json, &root, scratch.chars);
+    //printf("%p\n", root.contents.s);
 	printf("%s\n", root.contents.s);
+    destroy_element(elems, &root);
 	//printf("%s\n", root.contents.s);
 	//printf("%E\n", 3.0);
+
+    json_lib_close();
 
 	fclose(actual_json);
 }
