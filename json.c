@@ -37,7 +37,7 @@ int json_lib_init(){
 	scratch.pos = 0;
 	scratch.cap = 8 * 1024 * 1024;
 
-    ptr = calloc(sizeof(struct json_pool), 1);
+    ptr = calloc(1, sizeof(struct json_pool));
     if(!ptr){
         return 4;
     }
@@ -48,9 +48,14 @@ int json_lib_init(){
 }
 
 int json_lib_close(){
+    int ret = 0;
     free(read.chars);
+    read.chars = NULL;
     free(scratch.chars);
-    return destroy_pool(elems);
+    scratch.chars = NULL;
+    ret = destroy_pool(elems);
+    elems = NULL;
+    return ret;
 }
 
 /*
@@ -61,11 +66,10 @@ int init_pool(struct json_pool *pool, size_t size){
         return 1;
     }
 
-	struct json_element *storage = calloc(sizeof(struct json_pool), size);
-	if (storage == NULL){
+	pool->items = calloc(size, sizeof(struct json_pool));
+	if (pool->items == NULL){
 		return 2;
 	}
-	pool->items = storage;
 	pool->stored = 0;
 	pool->cap = size;
 	pool->next_free = NULL;
@@ -80,21 +84,27 @@ int destroy_pool(struct json_pool *pool){
         return 1;
     }
 
-    destroy_pool(pool->prev);
+    if(pool->prev != NULL){
+        destroy_pool(pool->prev);
+    }
 
 	size_t i = 0;
 	for(i = 0; i < pool->cap; i++){
 		destroy_element(pool, &((pool->items)[i]));
 	}
-    free(pool->items);
+    if(pool->items != NULL){
+        free(pool->items);
+        pool->items = NULL;
+    }
 
     free(pool);
+    pool = NULL;
 
 	return 0;
 }
 
 struct json_pool *double_pool(struct json_pool **pool){
-        struct json_pool *ptr = calloc(sizeof(struct json_pool), 1);
+        struct json_pool *ptr = calloc(1, sizeof(struct json_pool));
 
         if(!ptr){
             return NULL;
@@ -127,7 +137,7 @@ struct json_element *new_element(struct json_pool *pool){
 			pool->next_free = NULL;
 		}
 	} else {
-		now_taken = (struct json_element *) (pool + sizeof(struct json_element) * pool->stored);
+		now_taken = (struct json_element *) (pool->items + sizeof(struct json_element) * pool->stored++);
 	}
 	memset(now_taken, 0, sizeof(struct json_element));
 	return now_taken;
@@ -143,6 +153,7 @@ struct json_element *destroy_element(struct json_pool *pool, struct json_element
 
 	if(elem->type == JSON_STR){
 		free(elem->contents.s);
+        elem->contents.s = NULL;
 	} else if(elem->type == JSON_ARRAY){
 		//json_array_free(elem->contents.a);
 	} else if(elem->type == JSON_OBJECT){
@@ -354,23 +365,22 @@ static inline int is_json_object(char *str) {
 	return strlen(str) >= 1 && str[0] == '{';
 }
 
-struct json_element identify(char *str) {
-	struct json_element elem;
-	if((elem.flags = is_json_literal(str))){
-		elem.type = JSON_LITERAL;
-	} else if ((elem.flags = is_json_str(str))) {
-		elem.type = JSON_STR;
-	} else if ((elem.flags = is_json_num(str)) && (elem.flags & JSON_NUM_IS_NUM)) {
-		elem.type = JSON_NUM;
-	} else if ((elem.flags = is_json_array(str))) {
-		elem.type = JSON_ARRAY;
-	} else if ((elem.flags = is_json_object(str))) {
-		elem.type = JSON_OBJECT;
+int identify(char *str, struct json_element *elem) {
+	if((elem->flags = is_json_literal(str))){
+		elem->type = JSON_LITERAL;
+	} else if ((elem->flags = is_json_str(str))) {
+		elem->type = JSON_STR;
+	} else if ((elem->flags = is_json_num(str)) && (elem->flags & JSON_NUM_IS_NUM)) {
+		elem->type = JSON_NUM;
+	} else if ((elem->flags = is_json_array(str))) {
+		elem->type = JSON_ARRAY;
+	} else if ((elem->flags = is_json_object(str))) {
+		elem->type = JSON_OBJECT;
 	} else { 
-		elem.flags = 0;
-		elem.type = META_INVALID;
+		elem->flags = 0;
+		elem->type = META_INVALID;
 	}
-	return elem;
+	return elem->type;
 }
 
 enum json_literal get_json_literal(const char *ptr) {
@@ -449,7 +459,6 @@ char *get_json_str(struct queue *read, struct queue *scratch) {
 
 	scratch->base = 0;
 	scratch->pos = 0;	
-    printf("%p\n", ret);
 	return ret;
 }
 
@@ -475,7 +484,7 @@ struct json_element *get_json_array(FILE *file) {
 	while(!error && sep != ']'){
        	get_next(scratch.chars, &read);
 		//printf("%s\n", scratch.chars);
-		current = identify(scratch.chars);
+		identify(scratch.chars, &current);
 		process(file, &current, scratch.chars);
 		/*
 		Allocate new element from pool;
@@ -501,10 +510,6 @@ struct json_element *get_json_object(FILE *file) {
 }
 
 struct json_element *process(FILE *file, struct json_element *elem, char *fragment) {
-    /*
-     * Might need to rethink how I handle get_next and process because right now
-     * it is not possible to return an error saying an attempt to process failed.
-    */
     if(file == NULL || fragment == NULL){
         return NULL;
     }
@@ -582,49 +587,22 @@ void tests(){
 }
 
 int main() {
-	//struct json_element root = {};
-	//char outer[999];
-       	//get_next(outer, stdin);
-	//root.type = identify(outer);
-	//root.contents = process(stdin, root.type);
-	
 	tests();
-
 	json_lib_init();
+
 	FILE *actual_json = fopen("./test.json", "r");
 	FILE *test_json = fopen("./test2.json", "r");
 	fenqueue(test_json, &read, 3 * 1024 * 1024);
-	/*
-	void *store_chars = malloc(3 * 1024 * 1024);
-	if (store_chars == NULL){
-		exit(0);
-	}
-	struct queue store = {store_chars, 0, 0, 3 * 1024 * 1024};
-	char outer[99];
-	fenqueue(actual_json, &read, 3 * 1024 * 1024);
-	get_next(scratch.chars, &read);
-	get_next(scratch.chars, &read);	
-	get_next(scratch.chars, &read);	
-	get_next(scratch.chars, &read);	
-	get_next(scratch.chars, &read);	
-	*/
-//	printf("%s\n", outer);
-//	printf("%c\n", fgetc(actual_json));
-//	get_next(outer, actual_json);	
-//	printf("%s\n", outer);
-//	get_next(outer, actual_json);	
-//	printf("%s\n", outer);
-//	get_next(outer, actual_json);	
-//	printf("%s\n", outer);
+
     get_next(scratch.chars, &read);
 	printf("%s\n", scratch.chars);
-	struct json_element root = identify(scratch.chars);
-	process(actual_json, &root, scratch.chars);
-    //printf("%p\n", root.contents.s);
-	printf("%s\n", root.contents.s);
-    destroy_element(elems, &root);
-	//printf("%s\n", root.contents.s);
-	//printf("%E\n", 3.0);
+	struct json_element *root = new_element(elems);
+    if(root == NULL){
+        return 1;
+    }
+    identify(scratch.chars, root);
+	process(actual_json, root, scratch.chars);
+	printf("%s\n", root->contents.s);
 
     json_lib_close();
 

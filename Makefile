@@ -1,7 +1,7 @@
 release:
 	gcc ${CFLAGS} ${OPTIMIZE} json.c -o json
 
-debug:
+san:
 	gcc ${CFLAGS} ${DEBUG} ${SAN} json.c -o json
 
 test:
