@@ -151,7 +151,7 @@ struct json_element *destroy_element(struct json_pool *pool, struct json_element
 		return NULL;
 	}
 
-	if(elem->type == JSON_STR){
+	if(elem->type == JSON_STR && elem->contents.s != NULL){
 		free(elem->contents.s);
         elem->contents.s = NULL;
 	} else if(elem->type == JSON_ARRAY){
@@ -173,8 +173,8 @@ int array_add_element(struct json_element *array, struct json_element *elem){
 		return 1;
 	}
 	head = array->contents.a;
-	if(head->prev){
-		tail = array->contents.a->prev;
+	if(head && head->prev){
+		tail = head->prev;
 	};
 
 	if(!head){
@@ -234,10 +234,11 @@ int array_destroy_element(struct json_pool *pool, struct json_element *array, st
 }
 
 struct json_element *array_get_nth(struct json_element *array, size_t n){
-    if(array == NULL){
+	struct json_element *elem = array; 
+    if(array == NULL && array->contents.a){
         return NULL;
     }
-	struct json_element *elem = array; 
+    elem = array->contents.a;
 	while(n > 0 && elem){
 		n--;
 		elem = elem->next;
@@ -594,11 +595,23 @@ int main() {
     get_next(scratch.chars, &read);
 	printf("%s\n", scratch.chars);
 	struct json_element *root = new_element(elems);
+	struct json_element *elem_1 = new_element(elems);
+	struct json_element *elem_2 = new_element(elems);
+	struct json_element *elem_3 = new_element(elems);
     if(root == NULL){
         return 1;
     }
-	process(actual_json, root, scratch.chars);
-	printf("%s\n", root->contents.s);
+    root->type = JSON_ARRAY;
+	process(actual_json, elem_1, scratch.chars);
+    memcpy(elem_2, elem_1, sizeof(struct json_element));
+    memcpy(elem_3, elem_1, sizeof(struct json_element));
+    array_add_element(root, elem_1);
+    array_add_element(root, elem_2);
+    array_add_element(root, elem_3);
+    elem_1->contents.s = NULL;
+    elem_2->contents.s = NULL;
+	printf("%s\n", elem_3->contents.s);
+	printf("%s\n", array_get_nth(root, 2)->contents.s);
 
     json_lib_close();
 
