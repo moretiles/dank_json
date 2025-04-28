@@ -99,7 +99,7 @@ struct json_object {
  * Pool allocator
  */
 struct json_pool {
-	struct json_element **items;
+	struct json_element *items;
 	size_t stored;
 	size_t cap;
 	struct json_element *next_free;
@@ -167,7 +167,7 @@ struct json_element *get_json_array(FILE *file);
 
 struct json_element *get_json_object(FILE *file);
 
-union json_union process(FILE *file, enum json_type type, char *fragment);
+struct json_element *process(FILE *file, struct json_element *elem, char *fragment);
 
 void tests();
 
