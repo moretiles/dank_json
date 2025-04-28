@@ -107,6 +107,7 @@ struct json_pool {
 };
 
 int json_lib_init();
+int json_lib_close();
 
 /*
  * Init pool
