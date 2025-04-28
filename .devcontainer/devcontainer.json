@@ -1,5 +1,5 @@
 {
-    "name": "dank_json",
+    "name": "dank-json",
     "dockerFile": "Dockerfile",
     "init": true
 }

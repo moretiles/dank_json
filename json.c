@@ -8,53 +8,124 @@
 
 struct queue read;
 struct queue scratch;
+struct json_pool *elems;
 
 int json_lib_init(){
 	char *ptr = NULL;
 	/*
 	 * Maybe check env variables for max sizes
 	 */
-	if(read.chars != NULL && scratch.chars != NULL){
+	if(read.chars != NULL && scratch.chars != NULL && elems != NULL){
 		return 1;
 	}
 
-	ptr = malloc(sizeof(struct json_element) * 1024 * 1024);
+	ptr = malloc(8 * 1024 * 1024);
 	if(ptr == NULL){
 		return 2;
 	}
 	read.chars = ptr;
 	read.base = 0;
 	read.pos = 0;
-	read.cap = sizeof(struct json_element) * 1024 * 1024;
+	read.cap = 8 * 1024 * 1024;
 
 	ptr = malloc(8 * 1024 * 1024);
 	if(ptr == NULL){
-		return 2;
+		return 3;
 	}
 	scratch.chars = ptr;
 	scratch.base = 0;
 	scratch.pos = 0;
 	scratch.cap = 8 * 1024 * 1024;
 
+    ptr = malloc(sizeof(struct json_pool));
+    if(!ptr){
+        return 4;
+    }
+    init_pool(elems, 1024 * 1024);
+
 	return 0;
+}
+
+int json_lib_close(){
+    free(read.chars);
+    free(scratch.chars);
+    return destroy_pool(elems);
 }
 
 /*
  * Init pool
  */
-int init_pool(struct json_pool *pool){
+int init_pool(struct json_pool *pool, size_t size){
     if(pool == NULL){
         return 1;
     }
-	struct json_element **storage = malloc(sizeof(struct json_pool) * 1024 * 1024);
+
+	struct json_element **storage = malloc(sizeof(struct json_pool) * size);
 	if (storage == NULL){
 		return 2;
 	}
 	pool->items = storage;
 	pool->stored = 0;
-	pool->cap = 1024 * 1024;
+	pool->cap = size;
 	pool->next_free = NULL;
 	return 0;
+}
+
+/*
+ * Destroy pool
+ */
+int destroy_pool(struct json_pool *pool){
+    if(pool == NULL){
+        return 1;
+    }
+
+    destroy_pool(pool->prev);
+
+	size_t i = 0;
+	for(i = 0; i < pool->cap; i++){
+		destroy_element(pool, (pool->items)[i]);
+	}
+	return 0;
+}
+
+struct json_pool *double_pool(struct json_pool **pool){
+        struct json_pool *ptr = malloc(sizeof(struct json_pool));
+
+        if(!ptr){
+            return NULL;
+        }
+
+        init_pool(ptr, elems->cap * 2);
+        ptr->prev = *pool;
+        *pool = ptr;
+        return *pool;
+}
+
+/*
+ * New element
+ */
+struct json_element *new_element(struct json_pool *pool){
+    if(pool == NULL){
+        return NULL;
+    }
+
+    if(pool->stored == pool->cap){
+        double_pool(&elems);
+    }
+
+	struct json_element *now_taken = NULL;
+	if(pool->next_free){
+		now_taken = pool->next_free;
+		if(pool->next_free->type == META_FREE && pool->next_free->contents.n){
+			pool->next_free = pool->next_free->contents.n;
+		} else {
+			pool->next_free = NULL;
+		}
+	} else {
+		now_taken = (struct json_element *) (pool + sizeof(struct json_element) * pool->stored);
+	}
+	memset(now_taken, 0, sizeof(struct json_element));
+	return now_taken;
 }
 
 /*
@@ -160,44 +231,6 @@ struct json_element *array_get_nth(struct json_element *array, size_t n){
     } else {
 	    return elem;
     }
-}
-
-/*
- * Destroy pool
- */
-int destroy_pool(struct json_pool *pool){
-    if(pool == NULL){
-        return 1;
-    }
-
-	size_t i = 0;
-	for(i = 0; i < pool->cap; i++){
-		destroy_element(pool, (pool->items)[i]);
-	}
-	return 0;
-}
-
-/*
- * New element
- */
-struct json_element *new_element(struct json_pool *pool){
-    if(pool == NULL){
-        return NULL;
-    }
-
-	struct json_element *now_taken = NULL;
-	if(pool->next_free){
-		now_taken = pool->next_free;
-		if(pool->next_free->type == META_FREE && pool->next_free->contents.n){
-			pool->next_free = pool->next_free->contents.n;
-		} else {
-			pool->next_free = NULL;
-		}
-	} else {
-		now_taken = (struct json_element *) (pool + sizeof(struct json_element) * pool->stored);
-	}
-	memset(now_taken, 0, sizeof(struct json_element));
-	return now_taken;
 }
 
 static inline int is_whitespace(char c) {
@@ -424,7 +457,7 @@ double get_json_num(char *str) {
 }
 
 struct json_element *get_json_array(FILE *file) {
-	struct json_element *new_array;
+	struct json_element *new_array = NULL;
 	struct json_element current;
 	char sep = ',', error = 0;
 
@@ -433,14 +466,14 @@ struct json_element *get_json_array(FILE *file) {
     }
 
 	while(!error && sep != ']'){
-       		get_next(scratch.chars, &read);
+       	get_next(scratch.chars, &read);
 		//printf("%s\n", scratch.chars);
 		current = identify(scratch.chars);
 		current.contents = process(file, current.type, scratch.chars);
 		/*
 		Allocate new element from pool;
-		array_add_element(new_array, pool_element);
 		*/
+		array_add_element(new_array, pool_element);
 
 		sep = get_sep(&read);
 	}
