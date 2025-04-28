@@ -365,24 +365,6 @@ static inline int is_json_object(char *str) {
 	return strlen(str) >= 1 && str[0] == '{';
 }
 
-int identify(char *str, struct json_element *elem) {
-	if((elem->flags = is_json_literal(str))){
-		elem->type = JSON_LITERAL;
-	} else if ((elem->flags = is_json_str(str))) {
-		elem->type = JSON_STR;
-	} else if ((elem->flags = is_json_num(str)) && (elem->flags & JSON_NUM_IS_NUM)) {
-		elem->type = JSON_NUM;
-	} else if ((elem->flags = is_json_array(str))) {
-		elem->type = JSON_ARRAY;
-	} else if ((elem->flags = is_json_object(str))) {
-		elem->type = JSON_OBJECT;
-	} else { 
-		elem->flags = 0;
-		elem->type = META_INVALID;
-	}
-	return elem->type;
-}
-
 enum json_literal get_json_literal(const char *ptr) {
 	if(ptr == NULL){
 		return JSON_NULL;
@@ -484,7 +466,6 @@ struct json_element *get_json_array(FILE *file) {
 	while(!error && sep != ']'){
        	get_next(scratch.chars, &read);
 		//printf("%s\n", scratch.chars);
-		identify(scratch.chars, &current);
 		process(file, &current, scratch.chars);
 		/*
 		Allocate new element from pool;
@@ -510,9 +491,25 @@ struct json_element *get_json_object(FILE *file) {
 }
 
 struct json_element *process(FILE *file, struct json_element *elem, char *fragment) {
-    if(file == NULL || fragment == NULL){
+    char tmp_flags = 0;
+    if(file == NULL || elem == NULL || fragment == NULL){
         return NULL;
     }
+
+	if((tmp_flags = is_json_literal(fragment))){
+		elem->type = JSON_LITERAL;
+	} else if ((tmp_flags = is_json_str(fragment))) {
+		elem->type = JSON_STR;
+	} else if ((tmp_flags = is_json_num(fragment)) && (tmp_flags & JSON_NUM_IS_NUM)) {
+		elem->type = JSON_NUM;
+	} else if ((tmp_flags = is_json_array(fragment))) {
+		elem->type = JSON_ARRAY;
+	} else if ((tmp_flags = is_json_object(fragment))) {
+		elem->type = JSON_OBJECT;
+	} else { 
+		elem->type = META_INVALID;
+	}
+	elem->flags = tmp_flags;
 
 	switch(elem->type){
 		case JSON_LITERAL:
@@ -600,7 +597,6 @@ int main() {
     if(root == NULL){
         return 1;
     }
-    identify(scratch.chars, root);
 	process(actual_json, root, scratch.chars);
 	printf("%s\n", root->contents.s);
 
