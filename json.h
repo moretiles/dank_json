@@ -164,11 +164,11 @@ char *get_json_str(struct queue *read, struct queue *scratch);
 
 double get_json_num(char *str);
 
-struct json_element *get_json_array(FILE *file);
+struct json_element *get_json_array(struct queue *file, struct queue *scratch);
 
-struct json_element *get_json_object(FILE *file);
+struct json_element *get_json_object(struct queue *file, struct queue *scratch);
 
-struct json_element *process(FILE *file, struct json_element *elem, char *fragment);
+struct json_element *process(struct queue *file, struct json_element *elem, char *fragment);
 
 void tests();
 
