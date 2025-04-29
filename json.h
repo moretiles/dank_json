@@ -107,6 +107,7 @@ struct json_pool {
 };
 
 int json_lib_init();
+struct queue *json_open(char *fileName);
 int json_lib_close();
 
 /*
@@ -115,25 +116,39 @@ int json_lib_close();
 int init_pool(struct json_pool *pool, size_t size);
 
 /*
- * Destroy element
- */
-struct json_element *destroy_element(struct json_pool *pool, struct json_element *elem);
-
-int array_add_element(struct json_element *array, struct json_element *elem);
-
-int array_destroy_element(struct json_pool *pool, struct json_element *array, struct json_element *elem);
-
-struct json_element *array_get_nth(struct json_element *array, size_t n);
-
-/*
  * Destroy pool
  */
 int destroy_pool(struct json_pool *pool);
 
 /*
+ * Double pool
+ */
+struct json_pool *double_pool(struct json_pool **pool);
+
+/*
  * New element
  */
 struct json_element *new_element(struct json_pool *pool);
+
+/*
+ * Destroy element
+ */
+struct json_element *destroy_element(struct json_pool *pool, struct json_element *elem);
+
+/*
+ * Array add element
+ */
+int array_add_element(struct json_element *array, struct json_element *elem);
+
+/*
+ * Array destroy element
+ */
+int array_destroy_element(struct json_pool *pool, struct json_element *array, struct json_element *elem);
+
+/*
+ * Array get nth
+ */
+struct json_element *array_get_nth(struct json_element *array, size_t n);
 
 static inline int is_whitespace(char c);
 

@@ -81,10 +81,13 @@ int json_lib_close(){
     while(current){
         prev = current->prev;
 	    fclose(current->file);
+        current->file = NULL;
         free(current->chars);
+        current->chars = NULL;
         free(current);
         current = prev;
     }
+    openFiles = NULL;
     free(scratch.chars);
     scratch.chars = NULL;
     ret = destroy_pool(elems);
