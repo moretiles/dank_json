@@ -1,4 +1,8 @@
-json
+# tmp files
 tags
 .gdb_history
-atoi*
+
+# build files
+json
+atod.c
+atod
