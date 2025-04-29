@@ -33,6 +33,8 @@ struct queue {
     int pos;
     int base;
     int cap;
+    FILE *file;
+    struct queue *prev;
 };
 
 /* 
@@ -120,35 +122,35 @@ int foldDown(struct queue *store){
     return diff;
 }
 
-// Enqueue MAX_BLOCK_SIZE bytes from a file into store->chars
-int fenqueue(FILE *readFile, struct queue *store, int size){
+// Enqueue MAX_BLOCK_SIZE bytes from attached file into store->chars
+int fenqueue(struct queue *store, int size){
     int read = 0;
     if (store->pos + size > store->cap){
         return ERR_QUEUE_OUT_OF_MEMORY;;
     }
-    if(ferror(readFile)){
+    if(ferror(store->file)){
         return ERR_QUEUE_FILE_IO;
     }
 
-    read = fread(store->chars + store->pos, 1, size, readFile);
+    read = fread(store->chars + store->pos, 1, size, store->file);
     store->pos = store->pos + read;
     return read;
 }
 
 // Dequeue MAX_BLOCK_SIZE bytes in store->chars to a file
-int fdequeue(FILE *writeFile, struct queue *store, int size){
+int fdequeue(struct queue *store, int size){
     int difference = 0;
     int write = 0;
     if (store->pos == 0){
         return ERR_QUEUE_EMPTY;
     }
-    if(ferror(writeFile)){
+    if(ferror(store->file)){
         return ERR_QUEUE_FILE_IO;
     }
 
     difference = store->pos - store->base;
     size = (size > difference) ? difference : size;
-    write = fwrite(store->chars, 1, size, writeFile);
+    write = fwrite(store->chars, 1, size, store->file);
     store->pos = store->pos - difference;
     if(store->pos < 0){
         store->pos = 0;
