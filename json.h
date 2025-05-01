@@ -157,7 +157,7 @@ void get_next(char *outer, struct queue *store);
 /*
  * Return first non-whitespace character
  */
-char get_sep(struct queue *store);
+static inline char get_sep(struct queue *store);
 
 static inline int is_json_literal(char *str);
 
@@ -173,17 +173,17 @@ static inline int is_json_object(char *str);
 
 int identify(char *str, struct json_element *elem);
 
-enum json_literal get_json_literal(const char *ptr);
+static inline enum json_literal get_json_literal(const char *ptr);
 
 char *get_json_str(struct queue *read, struct queue *scratch);
 
-double get_json_num(char *str);
+static inline double get_json_num(char *str);
 
 struct json_element *get_json_array(struct queue *file, struct queue *scratch);
 
 struct json_element *get_json_object(struct queue *file, struct queue *scratch);
 
-struct json_element *process(struct queue *file, struct json_element *elem, char *fragment);
+struct json_element *process(struct queue *file, struct json_element *elem);
 
 void tests();
 
