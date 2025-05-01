@@ -6,7 +6,6 @@
 
 #include "json.h"
 
-struct queue *openFiles;
 struct queue scratch;
 struct json_pool *elems;
 
@@ -38,10 +37,11 @@ int json_lib_init(){
 	return 0;
 }
 
-struct queue *json_open(char *fileName){
-    void *ptr = NULL;
+struct json_element *json_open(char *fileName){
     struct queue *new = NULL;
+    char *chars = NULL;
     FILE *file = NULL;
+    struct json_element *root = NULL;
 
     new = calloc(1, sizeof(struct queue));
     if(new == NULL){
@@ -53,43 +53,37 @@ struct queue *json_open(char *fileName){
         return NULL;
     }
 
-	ptr = malloc(8 * 1024 * 1024);
-	if(ptr == NULL){
+	chars = malloc(8 * 1024 * 1024);
+	if(chars == NULL){
         free(new);
 		return NULL;
 	}
 
-	new->chars = ptr;
+    root = new_element(elems);
+	if(root == NULL){
+        free(chars);
+        free(new);
+		return NULL;
+	}
+
+	new->chars = chars;
 	new->base = 0;
 	new->pos = 0;
 	new->cap = 8 * 1024 * 1024;
     new->file = file;
-    new->prev = NULL;
 
-    if(openFiles){
-        new->prev = openFiles;
-    }
-    openFiles = new;
+    fenqueue(new, 8 * 1024 * 1024);
+    process(new, root); 
+    fclose(file);
+    free(chars);
+    free(new);
 
-    return new;
+    return root;
 }
 
 int json_lib_close(){
     int ret = 0;
-    struct queue *current = openFiles, *prev = NULL;
 
-    while(current){
-        prev = current->prev;
-	    fclose(current->file);
-        current->file = NULL;
-        free(current->chars);
-        current->chars = NULL;
-        free(current);
-        current = prev;
-    }
-    openFiles = NULL;
-    free(scratch.chars);
-    scratch.chars = NULL;
     ret = destroy_pool(elems);
     elems = NULL;
     return ret;
@@ -312,7 +306,7 @@ void get_next(char *outer, struct queue *store) {
 		outer[1] = '\x00';
 		return;
 	}
-	while (!is_whitespace(c)) {
+	while (!is_whitespace(c) && read_in < 50) {
 		if(c == ',' || c == ':'){
 			queueRewind(store, 1);
 			break;
@@ -506,19 +500,7 @@ struct json_element *get_json_array(struct queue *file, struct queue *scratch) {
     new_array->type = JSON_ARRAY;
 
 	while(!error && sep != ']'){
-        /*
-       	get_next(scratch->chars, file);
-        printf("%s\n", file->chars);
-        if (scratch->chars[0] == ']'){
-            break;
-        }
-        printf("%s\n", scratch->chars);
-		process(file, &current, scratch->chars);
-        */
 		process(file, &current);
-		/*
-		Allocate new element from pool;
-		*/
         from_pool = new_element(elems);
         memcpy(from_pool, &current, sizeof(struct json_element));
 		array_add_element(new_array, from_pool);
@@ -579,7 +561,6 @@ struct json_element *process(struct queue *file, struct json_element *elem) {
 			break;
 		case JSON_NUM:
 			elem->contents.d = get_json_num(fragment);
-			//sscanf(fragment, "%le", &(elem.d));
 			break;
 		case JSON_ARRAY:
 			memcpy(elem, get_json_array(file, &scratch), sizeof(struct json_element));
@@ -648,49 +629,17 @@ void tests(){
 int main() {
 	tests();
 	json_lib_init();
-	struct json_element array;
 
-	struct queue *actual_json = json_open("./test.json");
-	//struct queue *test_json = json_open("./test2.json");
+	struct json_element *array = json_open("./test.json");
 
-	fenqueue(actual_json, 3 * 1024 * 1024 - 1);
-	enqueuec(actual_json, 0);
-	process(actual_json, &array);
-    /*
-	actual_json->base += 1;
-	array = get_json_array(actual_json, &scratch);
-    */
 	printf("%p\n", &array);
-    struct json_element *interior = array_get_nth(array_get_nth(&array, 3), 3);
+    struct json_element *interior = array_get_nth(array_get_nth(array, 3), 3);
 	printf("%f\n", array_get_nth(interior, 0)->contents.d);
 	printf("%i\n", array_get_nth(interior, 0)->type);
 	printf("%i\n", array_get_nth(interior, 1)->contents.l);
 	printf("%i\n", array_get_nth(interior, 1)->type);
 	printf("%s\n", array_get_nth(interior, 2)->contents.s);
 	printf("%i\n", array_get_nth(interior, 2)->type);
-	/*
-	   fenqueue(test_json, &read, 3 * 1024 * 1024);
-	   get_next(scratch.chars, &read);
-	   printf("%s\n", scratch.chars);
-	   struct json_element *root = new_element(elems);
-	   struct json_element *elem_1 = new_element(elems);
-	   struct json_element *elem_2 = new_element(elems);
-	   struct json_element *elem_3 = new_element(elems);
-	   if(root == NULL){
-	   return 1;
-	   }
-	   root->type = JSON_ARRAY;
-	   process(test_json, elem_1, scratch.chars);
-	   memcpy(elem_2, elem_1, sizeof(struct json_element));
-	   memcpy(elem_3, elem_1, sizeof(struct json_element));
-	   array_add_element(root, elem_1);
-	   array_add_element(root, elem_2);
-	   array_add_element(root, elem_3);
-	   elem_1->contents.s = NULL;
-	   elem_2->contents.s = NULL;
-	   printf("%s\n", elem_3->contents.s);
-	   printf("%s\n", array_get_nth(root, 2)->contents.s);
-	*/
 
 	json_lib_close();
 }
