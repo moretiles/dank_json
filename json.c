@@ -6,6 +6,10 @@
 
 #include "json.h"
 
+#ifndef MAX_STR_SIZE
+#define MAX_STR_SIZE (4 * 1024 * 1024)
+#endif
+
 struct queue scratch;
 struct json_pool *elems;
 
@@ -18,14 +22,14 @@ int json_lib_init(){
 		return 1;
 	}
 
-	ptr = malloc(8 * 1024 * 1024);
+	ptr = malloc(2 * MAX_STR_SIZE);
 	if(ptr == NULL){
 		return 3;
 	}
 	scratch.chars = ptr;
 	scratch.base = 0;
 	scratch.pos = 0;
-	scratch.cap = 8 * 1024 * 1024;
+	scratch.cap = 2 * MAX_STR_SIZE;
 
     ptr = calloc(1, sizeof(struct json_pool));
     if(!ptr){
@@ -53,7 +57,7 @@ struct json_element *json_open(char *fileName){
         return NULL;
     }
 
-	chars = malloc(8 * 1024 * 1024);
+	chars = malloc(2 * MAX_STR_SIZE);
 	if(chars == NULL){
         free(new);
 		return NULL;
@@ -69,10 +73,10 @@ struct json_element *json_open(char *fileName){
 	new->chars = chars;
 	new->base = 0;
 	new->pos = 0;
-	new->cap = 8 * 1024 * 1024;
+	new->cap = 2 * MAX_STR_SIZE;
     new->file = file;
 
-    fenqueue(new, 8 * 1024 * 1024);
+    fenqueue(new, 2 * MAX_STR_SIZE);
     process(new, root); 
     fclose(file);
     free(chars);
