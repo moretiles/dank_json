@@ -1,8 +1,8 @@
 /*
- * qoifde.h -- header file that provides encodeQOI and decodeQOI
+ * queue.h -- header file that provides queue data structure to represent file
  *
- * Quite Okay Image Format Decoder / Encoder
- * https://github.com/moretiles/qoifde
+ * dank_json - Another tool for working with JSON in C
+ * https://github.com/moretiles/dank_json
  * Project licensed under Apache-2.0 license
  */
 
@@ -29,12 +29,11 @@
 #define ERR_QUEUE_FILE_IO (-1 * (1 << 9))
 
 struct queue {
+    FILE *file;
     char *chars;
     int pos;
     int base;
     int cap;
-    FILE *file;
-    struct queue *prev;
 };
 
 /* 

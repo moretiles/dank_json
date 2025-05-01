@@ -107,7 +107,7 @@ struct json_pool {
 };
 
 int json_lib_init();
-struct queue *json_open(char *fileName);
+struct json_element *json_open(char *fileName);
 int json_lib_close();
 
 /*
