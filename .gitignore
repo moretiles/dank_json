@@ -1,5 +1,17 @@
-# tmp files
+#
+# boilerplate for vim, sourced from:
+# https://github.com/github/gitignore/blob/main/Global/Vim.gitignore
+#
+*~
+[._]*.swp
+[._]swp
+Session.vim
+Sessionx.vim
+.netrwhist
 tags
+[._]*.un~
+
+# C tmp files
 .gdb_history
 
 # build files
