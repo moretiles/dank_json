@@ -12,6 +12,9 @@
 #define JSON_NUM_IS_SCIENTIFIC (1 << 1)
 #define JSON_NUM_IS_INT (1 << 2)
 
+#define FNV_PRIME (pow(2, 40) + pow(2, 8) + 0x3b)
+#define FNV_OFFSET_BASIS (14695981039346656037)
+
 /* 
  * enum for element types in json
  * 0 and 1 are internal
@@ -106,6 +109,14 @@ struct json_pool {
     struct json_pool *prev;
 };
 
+struct ht {
+    char **keys;
+    struct json_element **vals;
+    size_t count;
+    size_t cap;
+};
+
+
 int json_lib_init();
 struct json_element *json_open(char *fileName);
 int json_lib_close();
@@ -188,3 +199,14 @@ struct json_element *process(struct queue *file, struct json_element *elem);
 void tests();
 
 int main();
+
+uint64_t fnv(char *data, size_t len);
+static inline uint64_t fnv_str(char *data);
+struct json_element *ht_insert(struct ht *table, char *key, struct json_element *val) ;
+struct json_element *ht_find(struct ht *table, char *key);
+struct json_element *ht_set(struct ht *table, char *key, struct json_element *elem);
+struct json_element *ht_del(struct json_pool *pool, struct ht *table, char *key);
+struct ht *ht_grow(struct ht *old, size_t cap);
+void ht_destroy(struct json_pool *pool, struct ht *table);
+
+struct json_element;

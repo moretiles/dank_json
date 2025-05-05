@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <stdbool.h>
+#include <stdint.h>
+#include <math.h>
 
 #include "json.h"
 
@@ -88,6 +90,10 @@ struct json_element *json_open(char *fileName){
 int json_lib_close(){
     int ret = 0;
 
+    if(scratch.chars){
+        free(scratch.chars);
+        memset(&scratch, 0, sizeof(struct queue));
+    }
     ret = destroy_pool(elems);
     elems = NULL;
     return ret;
@@ -495,7 +501,7 @@ struct json_element *get_json_array(struct queue *file, struct queue *scratch) {
 	struct json_element current;
 	char sep = ',', error = 0;
 
-    printf("inside array\n");
+    //printf("inside array\n");
 
     if(file == NULL || scratch == NULL){
         return NULL;
@@ -510,11 +516,11 @@ struct json_element *get_json_array(struct queue *file, struct queue *scratch) {
 		array_add_element(new_array, from_pool);
 
 		sep = get_sep(file);
-        printf("%c\n", sep);
+        //printf("%c\n", sep);
 	}
 
 	if(!error){
-        printf("end\n");
+        //printf("end\n");
 		return new_array;
 	} else {
 		//array_destroy(read, new_array);
@@ -570,7 +576,7 @@ struct json_element *process(struct queue *file, struct json_element *elem) {
 			memcpy(elem, get_json_array(file, &scratch), sizeof(struct json_element));
 			break;
 		case JSON_OBJECT:
-            memcpy(elem, get_json_object(file, &scratch), sizeof(struct json_element));
+            //memcpy(elem, get_json_object(file, &scratch), sizeof(struct json_element));
 			break;
 		default:
 			/* print_error_messages_to_stderr(); */
@@ -581,6 +587,173 @@ struct json_element *process(struct queue *file, struct json_element *elem) {
     fragment = NULL;
     
     return elem;
+}
+
+uint64_t fnv(char *data, size_t len){
+    __uint128_t hash = FNV_OFFSET_BASIS;
+    size_t i = 0;
+    if(data == NULL){
+        return hash;
+    }
+
+    while (len > 8){
+        hash *= FNV_PRIME;
+        hash ^= (__uint128_t) data[i];
+        len -= 8;
+        i += 8;
+    }
+
+    hash *= FNV_PRIME;
+    while (len > 0){
+        hash ^= (__uint128_t) data[i] << (8 * (i % 8));
+        len--;
+        i++;
+    }
+    printf("fnv hash is %li\n", hash);
+
+    return (uint64_t) hash;
+}
+
+uint64_t fnv_str(char *data){
+    return (uint64_t) fnv(data, strlen(data));
+}
+
+struct json_element *ht_insert(struct ht *table, char *key, struct json_element *val) {
+    if(table == NULL || key == NULL || val == NULL){
+        return NULL;
+    }
+
+    struct ht *new = NULL;
+    uint64_t hash = fnv_str(key);
+    uint32_t offset = (uint32_t) (hash >> 32), iterate = (uint32_t) hash;
+    size_t max_possible = table->cap;
+    while(table->keys[offset % table->cap] != NULL && table->vals[offset % table->cap] != NULL && max_possible > 0){
+        offset += iterate;
+        max_possible -= 1;
+    }
+    if(max_possible == 0){
+        return NULL;
+    }
+    table->count += 1;
+    table->keys[offset % table->cap] = key;
+    table->vals[offset % table->cap] = val;
+    if(table->count > table->cap / 2 ){
+        new = ht_grow(table, (size_t) (table->cap * 2));
+        if(new != NULL){
+            free(table->vals);
+            table->vals = NULL;
+            free(table->keys);
+            table->keys = NULL;
+            memcpy(table, new, sizeof(struct ht));
+            free(new);
+            new = NULL;
+        }
+    }
+    return table->vals[offset % table->cap];
+}
+
+struct json_element *ht_find(struct ht *table, char *key){
+    if(table == NULL || key == NULL){
+        return NULL;
+    }
+
+    uint64_t hash = fnv_str(key);
+    printf("hash is %lu\n", hash);
+    uint32_t offset = (uint32_t) (hash >> 32), iterate = (uint32_t) hash;
+    printf("offset is %i\n", offset);
+    printf("iterate is %i\n", iterate);
+    size_t max_possible = table->cap;
+    while(max_possible > 0){
+        printf("offset is %i\n", offset);
+        if(table->keys[offset % table->cap] != NULL && table->vals[offset % table->cap] != NULL && !strcmp(table->keys[offset % table->cap], key)){
+            return table->vals[offset % table->cap];
+        }
+        offset += iterate;
+        max_possible -= 1;
+    }
+    return NULL;
+}
+
+struct json_element *ht_set(struct ht *table, char *key, struct json_element *elem){
+    if(table == NULL || key == NULL || elem == NULL){
+        return NULL;
+    }
+
+    struct json_element *target = ht_find(table, key);
+    if(target != NULL){
+        memcpy(target, elem, sizeof(struct json_element));
+    }
+    return target;
+}
+
+struct json_element *ht_del(struct json_pool *pool, struct ht *table, char *key){
+    if(table == NULL || key == NULL){
+        return NULL;
+    }
+
+    struct json_element *elem = ht_find(table, key);
+    if(elem == NULL){
+        return NULL;
+    }
+    uint64_t offset = (uint64_t) (elem - table->vals[0]);
+    free(table->keys[offset]);
+    table->keys = NULL;
+    destroy_element(pool, table->vals[offset]);
+    table->vals[offset] = NULL;
+    return elem;
+}
+
+struct ht *ht_grow(struct ht *old, size_t cap){
+    if(old == NULL){
+        return NULL;
+    }
+
+    struct ht *new = malloc(sizeof(struct ht));
+    char **new_keys = malloc(sizeof(char*) * cap);
+    struct json_element **new_vals = malloc(sizeof(struct json_element*) * cap);
+    size_t i = 0;
+    if(new == NULL || new_keys == NULL || new_vals == NULL){
+        return NULL;
+    }
+    new->keys = new_keys;
+    new->vals = new_vals;
+    new->cap = cap;
+    for(i = 0; i < old->cap; i++){
+        if(old->keys[i] == NULL || old->vals[i] == NULL){
+            continue;
+        }
+
+        ht_insert(new, old->keys[i], old->vals[i]);
+    }
+    return new;
+}
+
+void ht_destroy(struct json_pool *pool, struct ht *table){
+    size_t i = 0;
+
+    if(table == NULL){
+        return;
+    }
+
+    for(i = 0; i < table->cap; i++){
+        if(table->keys[i] != NULL){
+            free(table->keys[i]);
+            table->keys[i] = NULL;
+        }
+
+        if(table->vals[i] != NULL){
+            destroy_element(pool, table->vals[i]);
+            table->vals[i] = NULL;
+        }
+    }
+
+    free(table->keys);
+    table->keys = NULL;
+    free(table->vals);
+    table->vals = NULL;
+    free(table);
+    table = NULL;
+    return;
 }
 
 void tests(){
@@ -628,6 +801,7 @@ void tests(){
 	assert(is_json_array("[ a, b, c ]"));
 	assert(is_json_object("{a\": 3 }"));
 	assert(is_json_object("{ \"a\": 3 }"));
+
 }
 
 int main() {
@@ -645,5 +819,36 @@ int main() {
 	printf("%s\n", array_get_nth(interior, 2)->contents.s);
 	printf("%i\n", array_get_nth(interior, 2)->type);
 
-	json_lib_close();
+    char **keys = calloc(8, sizeof(char*));
+    struct json_element **vals = calloc(8, sizeof(struct json_element*));
+    assert(keys != NULL && vals != NULL);
+    struct ht *table = NULL;
+    table = malloc(sizeof(struct ht));
+    table->keys = keys;
+    table->vals = vals;
+    table->count = 0;
+    table->cap = 8;
+
+    char *key1 = malloc(sizeof(char) * 99);
+    char *key2 = malloc(sizeof(char) * 99);
+    char *key3 = malloc(sizeof(char) * 99);
+    strcpy(key1, "0000000000000000");
+    strcpy(key2, "aaaa");
+    strcpy(key3, "2222222222222222222222222");
+    printf("first inserted at %p\n", ht_insert(table, key1, array_get_nth(interior, 0)));
+    printf("second inserted at %p\n", ht_insert(table, key2, array_get_nth(interior, 1)));
+    printf("third inserted at %p\n", ht_insert(table, key3, array_get_nth(interior, 2)));
+
+    struct json_element* found = ht_find(table, "000000000000000");
+    if(found == NULL){
+        printf("Expected not to find. Working\n");
+    }
+    printf("%i\n", ht_find(table, key2)->contents.l);
+    printf("%s\n", ht_find(table, key3)->contents.s);
+    ht_set(table, key2, array_get_nth(interior, 2));
+    printf("%s\n", ht_find(table, key2)->contents.s);
+
+    //ht_destroy(elems, table);
+
+	//json_lib_close();
 }
