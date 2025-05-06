@@ -11,6 +11,9 @@ release:
 san:
 	gcc ${CFLAGS} ${DEBUG} ${SAN} json.c -o json
 
+gdb:
+	gcc ${CFLAGS} ${DEBUG} json.c -o json
+
 test:
 	gcc ${CFLAGS} ${DEBUG} ${SAN} json.c -o json
 	./json
