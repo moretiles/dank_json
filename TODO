@@ -1,5 +1,4 @@
-* Make hashmaps map json_element* to json_element* not char* to json_element*. Otherwise double free and use after free issues present themselves.
-* Fix ht_grow. Need to debug this more to identify the issue.
 * Create function that can be called to parse a hashmap and collect its child elements from text.
+* Create functions that properly copy strings, arrays, and hashmaps (recursively i.e. deep copy).
 
 Once I have hashmaps working the "core" functionality is there and I just need to think about how to provide a useful interface. No user should need to provide a pointer to the elements pool, for example, because it is an internal construct.

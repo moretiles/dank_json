@@ -196,16 +196,18 @@ struct json_element *get_json_object(struct queue *file, struct queue *scratch);
 
 struct json_element *process(struct queue *file, struct json_element *elem);
 
-struct json_element *copy_json_element(struct json_element *dest, struct json_element *src);
 struct json_element *copy_json_array(struct json_element *dest, struct json_element *src);
 struct json_element *copy_json_object(struct json_element *dest, struct json_element *src);
+struct json_element *copy_json_element(struct json_element *dest, struct json_element *src);
 
-uint64_t fnv(char *data, size_t len);
-static inline uint64_t fnv_str(char *data);
+uint64_t fnv(const char *data, size_t len);
+static inline uint64_t fnv_str(const char *data);
+
 struct json_element *ht_insert(struct ht *table, char *key, struct json_element *val) ;
+struct json_element *ht_insert_direct(struct ht *table, char *key, struct json_element *val);
 struct json_element *ht_find(struct ht *table, char *key);
 struct json_element *ht_set(struct ht *table, char *key, struct json_element *elem);
-struct json_element *ht_del(struct json_pool *pool, struct ht *table, char *key);
+struct json_element *ht_del(struct json_pool *pool, struct ht *table, const char *key);
 struct ht *ht_grow(struct ht *old, size_t cap);
 void ht_destroy(struct json_pool *pool, struct ht *table);
 
