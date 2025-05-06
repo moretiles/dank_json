@@ -196,9 +196,9 @@ struct json_element *get_json_object(struct queue *file, struct queue *scratch);
 
 struct json_element *process(struct queue *file, struct json_element *elem);
 
-void tests();
-
-int main();
+struct json_element *copy_json_element(struct json_element *dest, struct json_element *src);
+struct json_element *copy_json_array(struct json_element *dest, struct json_element *src);
+struct json_element *copy_json_object(struct json_element *dest, struct json_element *src);
 
 uint64_t fnv(char *data, size_t len);
 static inline uint64_t fnv_str(char *data);
@@ -210,3 +210,7 @@ struct ht *ht_grow(struct ht *old, size_t cap);
 void ht_destroy(struct json_pool *pool, struct ht *table);
 
 struct json_element;
+
+void tests();
+
+int main();
