@@ -774,8 +774,8 @@ struct json_element *ht_find(struct ht *table, char *key){
     //uint64_t offset = hash;
     uint32_t iterate = (uint32_t) hash;
     //uint32_t offset = (uint32_t) (hash >> 32), iterate = (uint32_t) hash;
-    printf("key is %s, offset is %u\n", key, offset);
-    printf("key is %s, iterate is %u\n", key, iterate);
+    //printf("key is %s, offset is %u\n", key, offset);
+    //printf("key is %s, iterate is %u\n", key, iterate);
     size_t max_possible = table->cap;
     while(max_possible > 0){
         //printf("offset is %lu\n", offset);
@@ -831,8 +831,8 @@ struct json_element *ht_del(struct json_pool *pool, struct ht *table, const char
     uint64_t hash = fnv_str(key);
     uint32_t offset = (uint32_t) (hash >> 32);
     uint32_t iterate = (uint32_t) hash;
-    printf("key is %s, offset is %u\n", key, offset);
-    printf("key is %s, iterate is %u\n", key, iterate);
+    //printf("key is %s, offset is %u\n", key, offset);
+    //printf("key is %s, iterate is %u\n", key, iterate);
     size_t max_possible = table->cap;
     while(max_possible > 0){
         //printf("offset is %lu\n", offset);
@@ -914,6 +914,11 @@ void ht_destroy(struct json_pool *pool, struct ht *table){
 }
 
 void tests(){
+    read_tests();
+    array_tests();
+}
+
+void read_tests(){
 	assert(is_whitespace(' '));
 	assert(is_whitespace('\n'));
 	assert(is_whitespace('\r'));
@@ -928,17 +933,6 @@ void tests(){
 	assert(is_json_str("\"bob\""));
 	assert(is_json_str("\"bob"));
 	assert(is_json_str("bob") == false);
-
-	/*
-	char test[10];
-	FILE *test_file = fopen("./test.txt", "r");
-	fgets(test, 10, test_file);
-	printf("%s\n", test);
-	printf("%i\n", is_json_str(test));
-	fgets(test, 10, test_file);
-	printf("%s\n", test);
-	fclose(test_file);
-	*/
 
 	assert(is_part_of_num('0'));
 	assert(is_part_of_num('9'));
@@ -958,23 +952,22 @@ void tests(){
 	assert(is_json_array("[ a, b, c ]"));
 	assert(is_json_object("{a\": 3 }"));
 	assert(is_json_object("{ \"a\": 3 }"));
-
 }
 
-int main() {
-	tests();
+void array_tests(){
 	json_lib_init();
 
-	struct json_element *array = json_open("./test.json");
+	struct json_element *array = json_open("./tests/test.json");
 
-	printf("%p\n", &array);
+    assert(array != NULL);
     struct json_element *interior = array_get_nth(array_get_nth(array, 3), 3);
-	printf("%f\n", array_get_nth(interior, 0)->contents.d);
-	printf("%i\n", array_get_nth(interior, 0)->type);
-	printf("%i\n", array_get_nth(interior, 1)->contents.l);
-	printf("%i\n", array_get_nth(interior, 1)->type);
-	printf("%s\n", array_get_nth(interior, 2)->contents.s);
-	printf("%i\n", array_get_nth(interior, 2)->type);
+    assert(interior != NULL);
+    assert(array_get_nth(interior, 0)->type == JSON_NUM);
+    assert(array_get_nth(interior, 1)->type == JSON_LITERAL);
+    assert(array_get_nth(interior, 2)->type == JSON_STR);
+    assert(array_get_nth(interior, 0)->contents.d == -57.638300);
+    assert(array_get_nth(interior, 1)->contents.l == JSON_FALSE);
+    assert(!strcmp("aab", array_get_nth(interior, 2)->contents.s));
 
     size_t tmp_cap = 1;
     char **keys = calloc(tmp_cap, sizeof(char*));
@@ -982,6 +975,7 @@ int main() {
     assert(keys != NULL && vals != NULL);
     struct ht *table = NULL;
     table = malloc(sizeof(struct ht));
+    assert(table != NULL);
     table->keys = keys;
     table->vals = vals;
     table->count = 0;
@@ -990,31 +984,23 @@ int main() {
     char *key1 = malloc(sizeof(char) * 99);
     char *key2 = malloc(sizeof(char) * 99);
     char *key3 = malloc(sizeof(char) * 99);
+    assert(key1 != NULL && key2 != NULL && key3 != NULL);
     strcpy(key1, "0");
     strcpy(key2, "yes hello test 1233");
     strcpy(key3, "bees bees are the best bees bees");
-    printf("first inserted at %p\n", ht_insert(table, key1, array_get_nth(interior, 0)));
-    printf("second inserted at %p\n", ht_insert(table, key2, array_get_nth(interior, 1)));
-    printf("third inserted at %p\n", ht_insert(table, key3, array_get_nth(interior, 2)));
-
+    //printf("first inserted at %p\n", ht_insert(table, key1, array_get_nth(interior, 0)));
+    assert(ht_insert(table, key1, array_get_nth(interior, 0)) != NULL);
+    assert(ht_insert(table, key2, array_get_nth(interior, 1)) != NULL);
+    assert(ht_insert(table, key3, array_get_nth(interior, 2)) != NULL);
     struct json_element* found = ht_find(table, "000000000000000");
-    if(found == NULL){
-        printf("Expected not to find. Working\n");
-    }
-    printf("key2 found %i\n", ht_find(table, key2)->contents.l);
-    printf("key3 found %s\n", ht_find(table, key3)->contents.s);
+    assert(found == NULL);
+    assert(ht_find(table, key2)->contents.l == JSON_FALSE);
+    assert(!strcmp("aab", ht_find(table, key3)->contents.s));
     ht_set(table, key2, array_get_nth(interior, 0));
-    printf("key2 found %f\n", ht_find(table, key2)->contents.d);
-    printf("key2 is %s before\n", key2);
+    assert(ht_find(table, key2)->contents.d == -57.638300);
     ht_del(elems, table, key2);
-    printf("key2 is %s now\n", key2);
     found = ht_find(table, key2);
-    if(found == NULL){
-        printf("Expected not to find key2. Working\n");
-    } else {
-        printf("key2 found %f\n", ht_find(table, key2)->contents.d);
-    }
-    printf("Did you know that struct json_element is %lu\n", sizeof(struct json_element));
+    assert(found == NULL);
 
     ht_destroy(elems, table);
     free(key1);
@@ -1025,4 +1011,8 @@ int main() {
     key3 = NULL;
 
 	json_lib_close();
+}
+
+int main() {
+	tests();
 }

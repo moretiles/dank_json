@@ -213,6 +213,8 @@ void ht_destroy(struct json_pool *pool, struct ht *table);
 
 struct json_element;
 
+void read_tests();
+void read_tests();
 void tests();
 
 int main();
