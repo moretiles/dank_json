@@ -49,7 +49,7 @@ union json_union {
 	double d;
 	char *s;
 	struct json_element *a;
-	struct json_element *o;
+	struct ht *o;
 	struct json_element *n;
 };
 
@@ -190,9 +190,9 @@ char *get_json_str(struct queue *read, struct queue *scratch);
 
 static inline double get_json_num(char *str);
 
-struct json_element *get_json_array(struct queue *file, struct queue *scratch);
+struct json_element *get_json_array(struct queue *file, struct queue *scratch, struct json_element *elem);
 
-struct json_element *get_json_object(struct queue *file, struct queue *scratch);
+struct json_element *get_json_object(struct queue *file, struct queue *scratch, struct json_element *elem);
 
 struct json_element *process(struct queue *file, struct json_element *elem);
 
@@ -214,7 +214,7 @@ void ht_destroy(struct json_pool *pool, struct ht *table);
 struct json_element;
 
 void read_tests();
-void read_tests();
-void tests();
+void array_tests();
+void object_tests();
 
 int main();
