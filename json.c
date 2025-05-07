@@ -12,6 +12,14 @@
 #define MAX_STR_SIZE (4 * 1024 * 1024)
 #endif
 
+#ifndef OBJECT_STARTING_SIZE
+#define OBJECT_STARTING_SIZE (16)
+#endif
+
+#ifndef TEST_BUILD
+#define TEST_BUILD (0)
+#endif
+
 struct queue scratch;
 struct json_pool *elems;
 
@@ -198,8 +206,8 @@ struct json_element *destroy_element(struct json_pool *pool, struct json_element
 	} else if(elem->type == JSON_ARRAY){
 		//json_array_free(elem->contents.a);
 	} else if(elem->type == JSON_OBJECT){
-        //ht_destroy(elems, elem->contents.o);
-        //elem->contents.o = NULL;
+        ht_destroy(elems, elem->contents.o);
+        elem->contents.o = NULL;
 		//json_object_free(elem->contents.o);
 	}
 
@@ -498,8 +506,8 @@ static inline double get_json_num(char *str) {
 	return out;
 }
 
-struct json_element *get_json_array(struct queue *file, struct queue *scratch) {
-	struct json_element *new_array = NULL, *from_pool = NULL;
+struct json_element *get_json_array(struct queue *file, struct queue *scratch, struct json_element *elem){
+	struct json_element *from_pool = NULL;
 	struct json_element current;
 	char sep = ',', error = 0;
 
@@ -508,14 +516,14 @@ struct json_element *get_json_array(struct queue *file, struct queue *scratch) {
     if(file == NULL || scratch == NULL){
         return NULL;
     }
-    new_array = new_element(elems);
-    new_array->type = JSON_ARRAY;
+    elem->contents.a = 0;
+    elem->type = JSON_ARRAY;
 
 	while(!error && sep != ']'){
 		process(file, &current);
         from_pool = new_element(elems);
         memcpy(from_pool, &current, sizeof(struct json_element));
-		array_add_element(new_array, from_pool);
+		array_add_element(elem, from_pool);
 
 		sep = get_sep(file);
         //printf("%c\n", sep);
@@ -523,15 +531,15 @@ struct json_element *get_json_array(struct queue *file, struct queue *scratch) {
 
 	if(!error){
         //printf("end\n");
-		return new_array;
+		return elem;
 	} else {
 		//array_destroy(read, new_array);
 		return NULL;
 	}
 }
 
-struct json_element *get_json_object(struct queue *file, struct queue *scratch) {
-    struct json_element *new_object = NULL, *key = NULL, *val = NULL;
+struct json_element *get_json_object(struct queue *file, struct queue *scratch, struct json_element *elem) {
+    struct json_element *key = NULL, *val = NULL;
     char **keys = NULL;
     struct json_element **vals = NULL;
     struct ht *table = NULL;
@@ -540,19 +548,18 @@ struct json_element *get_json_object(struct queue *file, struct queue *scratch) 
 		return NULL;
 	}
 
-    new_object = new_element(elems);
     table = calloc(1, sizeof(struct ht));
-    keys = calloc(16, sizeof(char*));
-    vals = calloc(16, sizeof(struct json_element*));
-    if (new_object == NULL || table == NULL || keys == NULL || vals == NULL){
+    keys = calloc(OBJECT_STARTING_SIZE, sizeof(char*));
+    vals = calloc(OBJECT_STARTING_SIZE, sizeof(struct json_element*));
+    if (table == NULL || keys == NULL || vals == NULL){
         return NULL;
     }
     table->keys = keys;
     table->vals = vals;
     table->count = 0;
-    table->cap = 16;
-    new_object->contents.o = table;
-    new_object->type = JSON_OBJECT;
+    table->cap = OBJECT_STARTING_SIZE;
+    elem->contents.o = table;
+    elem->type = JSON_OBJECT;
 
 	while(!error && sep != '}'){
         if(sep != ','){
@@ -576,7 +583,7 @@ struct json_element *get_json_object(struct queue *file, struct queue *scratch) 
 
 	if(!error){
         //printf("end\n");
-		return new_object;
+		return elem;
 
 		return NULL;
 	} else {
@@ -623,10 +630,10 @@ struct json_element *process(struct queue *file, struct json_element *elem) {
 			elem->contents.d = get_json_num(fragment);
 			break;
 		case JSON_ARRAY:
-			memcpy(elem, get_json_array(file, &scratch), sizeof(struct json_element));
+			get_json_array(file, &scratch, elem);
 			break;
-		case JSON_OBJECT:
-            memcpy(elem, get_json_object(file, &scratch), sizeof(struct json_element));
+        case JSON_OBJECT:
+            get_json_object(file, &scratch, elem);
 			break;
 		default:
 			/* print_error_messages_to_stderr(); */
@@ -640,9 +647,15 @@ struct json_element *process(struct queue *file, struct json_element *elem) {
 }
 
 struct json_element *copy_json_array(struct json_element *dest, struct json_element *src){
+    if(dest == NULL || src == NULL){
+        return NULL;
+    }
     return NULL;
 }
 struct json_element *copy_json_object(struct json_element *dest, struct json_element *src){
+    if(dest == NULL || src == NULL){
+        return NULL;
+    }
     return NULL;
 }
 struct json_element *copy_json_element(struct json_element *dest, struct json_element *src){
@@ -692,6 +705,10 @@ struct json_element *copy_json_element(struct json_element *dest, struct json_el
 }
 
 uint64_t fnv(const char *data, size_t len){
+    /* There is no bug here.
+     * It is okay for __uint128_t to hold a value that would be to big
+     * for some signed numbers.
+     */
     __uint128_t hash = FNV_OFFSET_BASIS;
     size_t i = 0;
     if(data == NULL){
@@ -853,6 +870,7 @@ struct json_element *ht_del(struct json_pool *pool, struct ht *table, const char
     table->vals[offset] = NULL;
     */
 
+    struct json_element *cleared = NULL;
     uint64_t hash = fnv_str(key);
     uint32_t offset = (uint32_t) hash;
     uint32_t iterate = (uint32_t) (hash >> 32);
@@ -862,11 +880,12 @@ struct json_element *ht_del(struct json_pool *pool, struct ht *table, const char
     while(max_possible > 0){
         //printf("offset is %lu\n", offset);
         if(table->keys[offset % table->cap] != NULL && table->vals[offset % table->cap] != NULL && !strcmp(table->keys[offset % table->cap], key)){
+            cleared = table->vals[offset % table->cap];
             free(table->keys[offset % table->cap]);
             table->keys[offset % table->cap] = NULL;
             destroy_element(pool, table->vals[offset % table->cap]);
             table->vals[offset % table->cap] = NULL;
-            return table->vals[offset % table->cap];
+            return cleared;
         } else if (table->keys[offset % table->cap] == NULL && table->vals[offset % table->cap] == NULL) {
             return NULL;
         }
@@ -938,12 +957,7 @@ void ht_destroy(struct json_pool *pool, struct ht *table){
     return;
 }
 
-void tests(){
-    read_tests();
-    array_tests();
-    object_tests();
-}
-
+#if TEST_BUILD == 1
 void read_tests(){
 	assert(is_whitespace(' '));
 	assert(is_whitespace('\n'));
@@ -1042,6 +1056,8 @@ void array_tests(){
 void object_tests(){
     json_lib_init();
 
+    assert(OBJECT_STARTING_SIZE == 1);
+
     struct json_element *root = json_open("./tests/object1.json");
     assert(root != NULL && root->contents.o != NULL);
     struct json_element *found_1 = ht_find(root->contents.o, "A");
@@ -1053,10 +1069,39 @@ void object_tests(){
     struct json_element *found_3 = ht_find(root->contents.o, "C");
     assert(found_3 != NULL);
     assert(found_3->contents.d == 12.0);
+    struct json_element *found_4 = ht_find(root->contents.o, "D");
+    assert(found_4->type == JSON_ARRAY);
+    struct json_element *second = array_get_nth(found_4, 1);
+    assert(second != NULL);
+    assert(second->type == JSON_NUM);
+    assert(second->contents.d == 1.0);
+
+    struct json_element *removed = ht_del(elems, root->contents.o, "A");;
+    assert(removed != NULL);
+    assert(found_1 == removed);
+
+    struct json_element *place_somewhere = new_element(elems);
+    assert(place_somewhere != NULL);
+    place_somewhere->contents.d = 3334.54;
+    place_somewhere->type = JSON_NUM;
+    struct json_element *placed = ht_set(root->contents.o, "B", place_somewhere);
+    assert(placed != NULL);
+    assert(placed == found_2);
+    assert(placed->contents.d == 3334.54);
 
     json_lib_close();
 }
 
 int main() {
-	tests();
+    read_tests();
+    array_tests();
+    object_tests();
+    printf("tests completed\n");
+    return 0;
 }
+#else
+int main() {
+    printf("this build does nothing\n");
+    return 0;
+}
+#endif

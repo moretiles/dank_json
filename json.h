@@ -190,9 +190,9 @@ char *get_json_str(struct queue *read, struct queue *scratch);
 
 static inline double get_json_num(char *str);
 
-struct json_element *get_json_array(struct queue *file, struct queue *scratch);
+struct json_element *get_json_array(struct queue *file, struct queue *scratch, struct json_element *elem);
 
-struct json_element *get_json_object(struct queue *file, struct queue *scratch);
+struct json_element *get_json_object(struct queue *file, struct queue *scratch, struct json_element *elem);
 
 struct json_element *process(struct queue *file, struct json_element *elem);
 
@@ -216,6 +216,5 @@ struct json_element;
 void read_tests();
 void array_tests();
 void object_tests();
-void tests();
 
 int main();
