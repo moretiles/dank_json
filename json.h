@@ -197,8 +197,6 @@ struct json_element *get_json_object(struct queue *file, struct queue *scratch, 
 struct json_element *process(struct queue *file, struct json_element *elem);
 
 struct json_element *copy_json_array(struct json_element *dest, struct json_element *src);
-struct json_element *copy_json_object(struct json_element *dest, struct json_element *src);
-struct json_element *copy_json_element(struct json_element *dest, struct json_element *src);
 
 uint64_t fnv(const char *data, size_t len);
 static inline uint64_t fnv_str(const char *data);
@@ -216,5 +214,6 @@ struct json_element;
 void read_tests();
 void array_tests();
 void object_tests();
+void copy_tests();
 
 int main();

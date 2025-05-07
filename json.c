@@ -87,7 +87,7 @@ struct json_element *json_open(char *fileName){
     new->file = file;
 
     fenqueue(new, 2 * MAX_STR_SIZE);
-    process(new, root); 
+    process(new, root);
     fclose(file);
     free(chars);
     free(new);
@@ -256,7 +256,7 @@ int array_add_element(struct json_element *array, struct json_element *elem){
 int array_destroy_element(struct json_pool *pool, struct json_element *array, struct json_element *elem){
 	struct json_element *prev = NULL, *next = NULL;
 
-	/* 
+	/*
 	 * It should always be the case that if prev exists then next exists and vice versa
 	 */
 	if(!pool || !array || !elem || array->type != JSON_ARRAY){
@@ -285,19 +285,20 @@ int array_destroy_element(struct json_pool *pool, struct json_element *array, st
 }
 
 struct json_element *array_get_nth(struct json_element *array, size_t n){
-	struct json_element *elem = array; 
-    if(array == NULL && array->contents.a){
+	struct json_element *elem = NULL;
+    if(array == NULL){
         return NULL;
     }
+
     elem = array->contents.a;
-	while(n > 0 && elem){
-		n--;
-		elem = elem->next;
-	}
-    if(n > 0){
-        return NULL;
+    while(n != 0 && elem != NULL && !(elem->flags & JSON_ELEM_IS_TAIL)){
+        n--;
+        elem = elem->next;
+    }
+    if(n == 0){
+        return elem;
     } else {
-	    return elem;
+        return NULL;
     }
 }
 
@@ -367,7 +368,7 @@ static inline int is_json_str(char *str) {
 }
 
 static inline int is_part_of_num(char c) {
-	return c == 'e' || 
+	return c == 'e' ||
 		c == 'E' ||
 		c == '.' ||
 		(c >= '0' && c <= '9');
@@ -520,6 +521,9 @@ struct json_element *get_json_array(struct queue *file, struct queue *scratch, s
     elem->type = JSON_ARRAY;
 
 	while(!error && sep != ']'){
+        if(sep != ','){
+            return NULL;
+        }
 		process(file, &current);
         from_pool = new_element(elems);
         memcpy(from_pool, &current, sizeof(struct json_element));
@@ -614,7 +618,7 @@ struct json_element *process(struct queue *file, struct json_element *elem) {
 		elem->type = JSON_ARRAY;
 	} else if ((tmp_flags = is_json_object(fragment))) {
 		elem->type = JSON_OBJECT;
-	} else { 
+	} else {
 		elem->type = META_INVALID;
 	}
 	elem->flags = tmp_flags;
@@ -642,35 +646,32 @@ struct json_element *process(struct queue *file, struct json_element *elem) {
 
     free(fragment);
     fragment = NULL;
-    
+
     return elem;
 }
 
-struct json_element *copy_json_array(struct json_element *dest, struct json_element *src){
-    if(dest == NULL || src == NULL){
-        return NULL;
-    }
-    return NULL;
-}
-struct json_element *copy_json_object(struct json_element *dest, struct json_element *src){
-    if(dest == NULL || src == NULL){
-        return NULL;
-    }
-    return NULL;
-}
 struct json_element *copy_json_element(struct json_element *dest, struct json_element *src){
+    size_t i = 0;
     char *new_str = NULL;
+    struct json_element *orig_child = NULL, *new_child = NULL;
+    char **keys = NULL;
+    struct json_element **vals = NULL;
+    struct ht *table = NULL;
 
     if(dest == NULL || src == NULL){
         return NULL;
     }
 
     switch(src->type){
-        case META_INVALID:
-        case META_FREE:
         case JSON_LITERAL:
-        case JSON_NUM:
             memcpy(dest, src, sizeof(struct json_element));
+            break;
+        case JSON_NUM:
+            dest->contents.d = src->contents.d;
+            dest->type = JSON_NUM;
+            dest->flags = src->flags;
+            dest->prev = NULL;
+            dest->next = NULL;
             break;
         case JSON_STR:
             if(src->contents.s == NULL){
@@ -683,21 +684,73 @@ struct json_element *copy_json_element(struct json_element *dest, struct json_el
             }
             strncpy(new_str, src->contents.s, strlen(src->contents.s) + 1);
             dest->contents.s = new_str;
-            dest->type = src->type;
+            dest->type = JSON_STR;
             dest->flags = src->flags;
+            dest->prev = NULL;
+            dest->next = NULL;
             break;
         case JSON_ARRAY:
-            if(copy_json_array(dest, src) == NULL){
+            /*
+            orig_child = new_element(elems);
+            new_child = new_element(elems);
+            if(src == NULL || orig_child == NULL || new_child == NULL){
+            */
+            if(src == NULL){
                 return NULL;
             }
+            if(src->contents.a == NULL){
+                return NULL;
+            }
+            memset(dest, 0, sizeof(struct json_element));
+            dest->type = JSON_ARRAY;
+            orig_child = src->contents.a;
+            while(orig_child != NULL){
+                new_child = new_element(elems);
+                copy_json_element(new_child, orig_child);
+                array_add_element(dest, new_child);
+
+                if (!(orig_child->flags & JSON_ELEM_IS_TAIL)){
+                    orig_child = orig_child->next;
+                }else{
+                    orig_child = NULL;
+                }
+            }
+
             break;
         case JSON_OBJECT:
-            if(copy_json_object(dest, src) == NULL){
+            if(src == NULL || src->contents.o == NULL || src->contents.o->keys == NULL || src->contents.o->vals == NULL){
                 return NULL;
             }
+
+            table = calloc(1, sizeof(struct ht));
+            keys = calloc(OBJECT_STARTING_SIZE, sizeof(char*));
+            vals = calloc(OBJECT_STARTING_SIZE, sizeof(struct json_element*));
+            if(table == NULL || keys == NULL || vals == NULL){
+                return NULL;
+            }
+            memset(dest, 0, sizeof(struct json_element));
+            table->keys = keys;
+            table->vals = vals;
+            table->count = 0;
+            table->cap = OBJECT_STARTING_SIZE;
+            dest->contents.o = table;
+            dest->flags = 0;
+            dest->type = JSON_OBJECT;
+            for(i = 0; i < src->contents.o->cap; i++){
+                if(src->contents.o->keys[i] == NULL || src->contents.o->vals[i] == NULL){
+                    continue;
+                }
+
+                new_child = new_element(elems);
+                new_str = src->contents.o->keys[i];
+                copy_json_element(new_child, src->contents.o->vals[i]);
+                ht_insert(dest->contents.o, new_str, new_child);
+            }
+
             break;
         default:
             return NULL;
+            break;
     }
     dest->prev = NULL;
     dest->next = NULL;
@@ -1068,7 +1121,7 @@ void object_tests(){
     assert(found_2->contents.d == 11.0);
     struct json_element *found_3 = ht_find(root->contents.o, "C");
     assert(found_3 != NULL);
-    assert(found_3->contents.d == 12.0);
+    assert(!strcmp(found_3->contents.s, "some text I guess"));
     struct json_element *found_4 = ht_find(root->contents.o, "D");
     assert(found_4->type == JSON_ARRAY);
     struct json_element *second = array_get_nth(found_4, 1);
@@ -1092,10 +1145,113 @@ void object_tests(){
     json_lib_close();
 }
 
+void copy_tests(){
+    json_lib_init();
+
+    struct json_element *literal = new_element(elems);
+    literal->contents.l = JSON_TRUE;
+    literal->type = JSON_LITERAL;
+    literal->flags = 0;
+    literal->prev = NULL;
+    literal->next = NULL;
+    struct json_element *new_literal = new_element(elems);
+    copy_json_element(new_literal, literal);
+    assert(literal != new_literal);
+    assert(literal->type == JSON_LITERAL && new_literal->type == JSON_LITERAL);
+    assert(literal->contents.l == JSON_TRUE && new_literal->contents.l == JSON_TRUE);
+
+    struct json_element *num = new_element(elems);
+    num->contents.d = 333.333311111;
+    num->type = JSON_NUM;
+    num->flags = 0;
+    num->prev = NULL;
+    num->next = NULL;
+    struct json_element *new_num = new_element(elems);
+    copy_json_element(new_num, num);
+    assert(num != new_num);
+    assert(num->type == JSON_NUM && new_num->type == JSON_NUM);
+    assert(num->contents.d == 333.333311111 && new_num->contents.d == 333.333311111);
+
+    char *chars = calloc(50, sizeof(char));
+    assert(chars != NULL);
+    strncpy(chars, "we are testing now", 50 - 1);
+    struct json_element *str = new_element(elems);
+    str->contents.s = chars;
+    str->type = JSON_STR;
+    str->flags = 0;
+    str->prev = NULL;
+    str->next = NULL;
+    struct json_element *new_str = new_element(elems);
+    copy_json_element(new_str, str);
+    assert(str != new_str && str->contents.s != new_str->contents.s);
+    assert(str->type == JSON_STR && new_str->type == JSON_STR);
+    assert(!strcmp(str->contents.s, chars) && !strcmp(new_str->contents.s, chars));
+
+    struct json_element *array = json_open("./tests/array1.json");
+    struct json_element *object = json_open("./tests/object1.json");
+    struct json_element *new_array = new_element(elems);
+    struct json_element *new_object = new_element(elems);
+    assert(array != NULL && object != NULL && new_array != NULL && new_object != NULL);
+
+    copy_json_element(new_array, array);
+    assert(new_array->type == JSON_ARRAY);
+    struct json_element *array_first = array_get_nth(array, 0);
+    struct json_element *new_array_first = array_get_nth(new_array, 0);
+    assert(array_first != new_array_first);
+    assert(array_first->type == JSON_NUM && new_array_first->type == JSON_NUM);
+    assert(array_first->contents.d == -57.6383 && new_array_first->contents.d == -57.6383);
+    struct json_element *array_second = array_get_nth(array, 1);
+    struct json_element *new_array_second = array_get_nth(new_array, 1);
+    assert(array_second != new_array_second);
+    assert(array_second->type == JSON_LITERAL && new_array_second->type == JSON_LITERAL);
+    assert(array_second->contents.l == JSON_FALSE && new_array_second->contents.l == JSON_FALSE);
+    struct json_element *array_third = array_get_nth(array, 2);
+    struct json_element *new_array_third = array_get_nth(new_array, 2);
+    assert(array_third != new_array_third);
+    assert(array_third->type == JSON_STR && new_array_third->type == JSON_STR);
+    assert(!strcmp(array_third->contents.s, new_array_third->contents.s));
+    assert(array_get_nth(array, 3) == NULL);
+    assert(array_get_nth(new_array, 3) == NULL);
+
+    copy_json_element(new_object, object);
+    assert(new_object->type == JSON_OBJECT);
+    struct json_element *A = ht_find(object->contents.o, "A");
+    struct json_element *new_A = ht_find(new_object->contents.o, "A");
+    assert(A != new_A);
+    assert(A->type == JSON_NUM && new_A->type == JSON_NUM);
+    assert(A->contents.d == 10.0 && new_A->contents.d == 10.0);
+    struct json_element *B = ht_find(object->contents.o, "B");
+    struct json_element *new_B = ht_find(new_object->contents.o, "B");
+    assert(B != new_B);
+    assert(B->type == JSON_NUM && new_B->type == JSON_NUM);
+    assert(B->contents.d == 11.0 && new_B->contents.d == 11.0);
+    struct json_element *C = ht_find(object->contents.o, "C");
+    struct json_element *new_C = ht_find(new_object->contents.o, "C");
+    assert(C != NULL);
+    assert(new_C != NULL);
+    assert(C != new_C);
+    assert(C->type == JSON_STR && new_C->type == JSON_STR);
+    assert(!strcmp(C->contents.s, "some text I guess") && !strcmp(new_C->contents.s, "some text I guess"));
+    struct json_element *D = ht_find(object->contents.o, "D");
+    struct json_element *new_D = ht_find(new_object->contents.o, "D");
+    assert(D != NULL);
+    assert(new_D != NULL);
+    assert(D != new_D);
+    assert(D->type == JSON_ARRAY && new_D->type == JSON_ARRAY);
+    struct json_element *interior_last = array_get_nth(D, 2);
+    struct json_element *new_interior_last = array_get_nth(new_D, 2);
+    assert(interior_last != NULL);
+    assert(new_interior_last != NULL);
+    assert(!strcmp(interior_last->contents.s, "yes") && !strcmp(new_interior_last->contents.s, "yes"));
+
+    json_lib_close();
+}
+
 int main() {
     read_tests();
     array_tests();
     object_tests();
+    copy_tests();
     printf("tests completed\n");
     return 0;
 }
