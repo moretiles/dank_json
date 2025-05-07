@@ -216,5 +216,6 @@ struct json_element;
 void read_tests();
 void array_tests();
 void object_tests();
+void copy_tests();
 
 int main();
