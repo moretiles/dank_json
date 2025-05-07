@@ -49,7 +49,7 @@ union json_union {
 	double d;
 	char *s;
 	struct json_element *a;
-	struct json_element *o;
+	struct ht *o;
 	struct json_element *n;
 };
 
@@ -214,7 +214,8 @@ void ht_destroy(struct json_pool *pool, struct ht *table);
 struct json_element;
 
 void read_tests();
-void read_tests();
+void array_tests();
+void object_tests();
 void tests();
 
 int main();

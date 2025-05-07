@@ -17,3 +17,7 @@ gdb:
 test:
 	gcc ${CFLAGS} ${DEBUG} ${SAN} json.c -o json
 	./json
+
+debug:
+	gcc ${CFLAGS} ${DEBUG} json.c -o json
+	./json
