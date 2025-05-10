@@ -1,8 +1,8 @@
 #include "queue.h"
 
-/* 
- * json element flags
- * The four leading bits are used to store flags relevent across all json_element types
+/*
+ * json node flags
+ * The four leading bits are used to store flags relevent across all json_node types
  * The four trailing bits are used to store flags relevent just to a specific type
  */
 #define JSON_ELEM_IS_HEAD (1 << 7)
@@ -12,89 +12,87 @@
 #define JSON_NUM_IS_SCIENTIFIC (1 << 1)
 #define JSON_NUM_IS_INT (1 << 2)
 
-#define FNV_PRIME (pow(2, 40) + pow(2, 8) + 0x3b)
+//#define FNV_PRIME (pow(2, 40) + pow(2, 8) + 0x3b)
+#define FNV_PRIME (1099511628091)
 #define FNV_OFFSET_BASIS (14695981039346656037)
 
-/* 
- * enum for element types in json
+/*
+ * Possible type values
  * 0 and 1 are internal
  * 2 to 6 are actual types
  */
-enum json_type {
-	META_INVALID = 0,
-	META_FREE = 1,
-	JSON_LITERAL = 2,
-	JSON_STR = 3,
-	JSON_NUM = 4,
-	JSON_ARRAY = 5,
-	JSON_OBJECT = 6
-};
+#define META_INVALID (0)
+#define META_FREE (1)
+#define JSON_ELEMENT (1 << 1)
+#define JSON_LITERAL (1 << 2)
+#define JSON_STR (1 << 3)
+#define JSON_NUM (1 << 4)
+#define JSON_ARRAY (1 << 5)
+#define JSON_OBJECT (1 << 6)
 
 /*
- * Maybe
+ * Possible values for literal
  */
-enum json_literal {
-	JSON_TRUE = 0,
-	JSON_FALSE = 1,
-	JSON_NULL = 2
-};
+#define JSON_TRUE (0)
+#define JSON_FALSE (1)
+#define JSON_NULL (2)
 
-/* 
- * union so we can store all possible types of json values 
+/*
+ * union so we can store all possible types of json values
  * l, d, s, a, and o are for holding actual json types
- * n is for holding the pointer to the next free element
+ * n is for holding the pointer to the next free node
  */
 union json_union {
-	enum json_literal l;
+	char l;
 	double d;
 	char *s;
-	struct json_element *a;
+	struct json_node *a;
 	struct ht *o;
-	struct json_element *n;
+	struct json_node *n;
 };
 
 /*
- * Actual element
- * The field `contents` stores the data of this element.
- * The field `type` stores the type of this element.
+ * Actual node
+ * The field `contents` stores the data of this node.
+ * The field `type` stores the type of this node.
  * The field `flags` stores metadata abouth the type/data.
  *
- * We make the assumption that almost every element is going to be stored in an array or object.
+ * We make the assumption that almost every node is going to be stored in an array or object.
  * As both are implemented as linked lists we include a `prev` and `next` field.
  * If (flags & JSON_ELEM_IS_HEAD) then prev goes to tail.
  * If (flags & JSON_ELEM_IS_TAIL) then next goes to head.
  */
-struct json_element {
+typedef struct json_node {
 	union json_union contents;
-	enum json_type type;
+	char type;
 	char flags;
-	struct json_element *prev;
-	struct json_element *next;
-};
+	struct json_node *prev;
+	struct json_node *next;
+} JSON_Node;
 
 /* Just a linked list */
 /*
 struct json_array {
-	struct json_array_element **head;
-	size_t elements;
+	struct json_array_node **head;
+	size_t nodes;
 };
 */
 
 /*
- * individual array element
+ * individual array node
  */
 /*
-struct json_array_element {
-	union json_union *element;
-	struct json_array_element *next;
+struct json_array_node {
+	union json_union *node;
+	struct json_array_node *next;
 };
 */
 
 /* Linked list for now, eventually will need to be a real hashmap */
 /*
 struct json_object {
-	struct json_array_element **head;
-	size_t elements;
+	struct json_array_node **head;
+	size_t nodes;
 };
 */
 
@@ -102,24 +100,243 @@ struct json_object {
  * Pool allocator
  */
 struct json_pool {
-	struct json_element *items;
+	JSON_Node *items;
 	size_t stored;
 	size_t cap;
-	struct json_element *next_free;
+	JSON_Node *next_free;
     struct json_pool *prev;
 };
 
 struct ht {
     char **keys;
-    struct json_element **vals;
+    JSON_Node **vals;
     size_t count;
     size_t cap;
 };
 
 
-int json_lib_init();
-struct json_element *json_open(char *fileName);
-int json_lib_close();
+/*
+ * Initializes this library.
+ */
+int jsonInit();
+
+/*
+ * Opens `filename` and returns root of the JSON document.
+ * Fails if the JSON document provided is invalid.
+ */
+JSON_Node *jsonOpen(const char *fileName);
+
+/*
+ * Closes `filename` terminating all associated nodes.
+ * Shallow copied nodes derived from members of the file are also terminated.
+ */
+void jsonClose(const char *fileName);
+
+/*
+ * Terminates all resources used by this library.
+ */
+int jsonEnd();
+
+/*
+ * Provides you with a new node.
+ *
+ * You will never call free on a returned node. Ever.
+ * The memory used for this node will be freed upon under any of the below conditions:
+ * 1. Calling jsonDelete on this node.
+ * 2. Calling jsonClose on the file associated with this node.
+ * 3. Calling jsonEnd.
+ */
+JSON_Node *jsonNew();
+
+/*
+ * Expresses a string as a key to be used when accessing a object's fields.
+ */
+char *_KEY(const char* key);
+
+/*
+ * Expresses an offset as an index to be used when accessing an array's fields.
+ */
+char *_INDEX(const size_t index);
+
+/*
+ * Creates a new node under `root` with the type `type` and the value `val`.
+ *
+ * Paths are given execl style.
+ * The function is smart to figure out whether you want to access a key or index.
+ */
+JSON_Node *jsonCreatel(const void *val, const char type, JSON_Node *root, const char *first, ...);
+
+/*
+ * Creates a new node under `root` with the type `type` and the value `val`.
+ *
+ * Paths are given execv style.
+ * The function is smart to figure out whether you want to access a key or index.
+ */
+JSON_Node *jsonCreatev(const void *val, const char type, JSON_Node *root, const void** keys);
+
+/*
+ * Returns the node at the provided path below the `root`.
+ *
+ * Paths are given execl style.
+ * The function is smart to figure out whether you want to access a key or index.
+ */
+JSON_Node *jsonReadl(const JSON_Node *root, const char *first, ...);
+
+/*
+ * Returns the node at the provided path below the `root`.
+ * 
+ * Paths are given execv style.
+ * The function is smart to figure out whether you want to access a key or index.
+ */
+JSON_Node *jsonReadv(const JSON_Node *root, const void** keys);
+
+/*
+ * Returns a deep copy of the node `elem` and its child nodes.
+ */
+JSON_Node *jsonCopy(const JSON_Node *elem);
+
+/*
+ * Returns a deep copy of the node and its child nodes at the provided path below the `root`.
+ *
+ * Paths are given execl style.
+ * The function is smart to figure out whether you want to access a key or index.
+ */
+JSON_Node *jsonCopyl(const void *val, const char type, const JSON_Node *root, const char *first, ...);
+
+/*
+ * Returns a deep copy of the node and its child nodes at the provided path below the `root`.
+ *
+ * Paths are given execv style.
+ * The function is smart to figure out whether you want to access a key or index.
+ */
+JSON_Node *jsonCopyv(const void *val, const char type, const JSON_Node *root, const void** keys);
+
+/*
+ * Updates the provided node `elem` to be type `type` and hold value `val`.
+ */
+JSON_Node *jsonUpdate(const char type, const void *val, JSON_Node *elem);
+
+/*
+ * Updates the provided node `elem` to be type `type` and hold value `val`.
+ *
+ * Paths are given execl style.
+ * The function is smart to figure out whether you want to access a key or index.
+ */
+JSON_Node *jsonUpdatel(const void *val, const char type, JSON_Node *root, const char *first, ...);
+
+/*
+ * Updates the provided node `elem` to be type `type` and hold value `val`.
+ *
+ * Paths are given execv style.
+ * The function is smart to figure out whether you want to access a key or index.
+ */
+JSON_Node *jsonUpdatev(const void *val, const char type, JSON_Node *root, const void** keys);
+
+/*
+ * Deletes the node `elem`.
+ */
+JSON_Node *jsonDelete(JSON_Node *elem);
+
+/*
+ * Deletes the node `elem`.
+ *
+ * Paths are given execl style.
+ * The function is smart to figure out whether you want to access a key or index.
+ */
+JSON_Node *jsonDeletel(JSON_Node *root, const char *first, ...);
+
+/*
+ * Deletes the node `elem`.
+ *
+ * Paths are given execv style.
+ * The function is smart to figure out whether you want to access a key or index.
+ */
+JSON_Node *jsonDeletev(JSON_Node *root, const void** keys);
+
+/*
+ * Deep copies the value held by the node `elem` into `dest`.
+ * If `dest` is NULL then allocation is done from the heap.
+ */
+void *jsonUnpack(void *dest, const JSON_Node *src);
+
+/*
+ * Deep copies the value held by the node `elem` into `dest`.
+ * If `dest` is NULL then allocation is done from the heap.
+ *
+ * Paths are given execl style.
+ * The function is smart to figure out whether you want to access a key or index.
+ */
+void *jsonUnpackl(void *dest, const JSON_Node *root, const char *first, ...);
+
+/*
+ * Deep copies the value held by the node `elem` into `dest`.
+ * If `dest` is NULL then allocation is done from the heap.
+ *
+ * Paths are given execv style.
+ * The function is smart to figure out whether you want to access a key or index.
+ */
+void *jsonUnpackv(void *dest, const JSON_Node *root, const void** keys);
+
+/*
+ * Gets the length of the string held by the node `root`.
+ */
+size_t jsonStrlen(const JSON_Node *root);
+
+/*
+ * Gets the length of the string held by the node `root`.
+ *
+ * Paths are given execl style.
+ * The function is smart to figure out whether you want to access a key or index.
+ */
+size_t jsonStrlenl(const JSON_Node *root, const char *first, ...);
+
+/*
+ * Gets the length of the string held by the node `root`.
+ *
+ * Paths are given execv style.
+ * The function is smart to figure out whether you want to access a key or index.
+ */
+size_t jsonStrlenv(const JSON_Node *root, const void** keys);
+
+/*
+ * Write the node `elem` as a JSON string to `dest`.
+ * If min is anything other than 0 then we minify the output so there is no whitespace.
+ */
+char *jsonString(char *dest, const char minify, const JSON_Node *elem);
+
+/*
+ * Write the node `elem` as a JSON string to `dest`.
+ * If min is anything other than 0 then we minify the output so there is no whitespace.
+ *
+ * Paths are given execl style.
+ * The function is smart to figure out whether you want to access a key or index.
+ */
+char *jsonStringl(char *dest, const char minify, const JSON_Node *root, const char *first, ...);
+
+/*
+ * Write the node `elem` as a JSON string to `dest`.
+ * If min is anything other than 0 then we minify the output so there is no whitespace.
+ *
+ * Paths are given execv style.
+ * The function is smart to figure out whether you want to access a key or index.
+ */
+char *jsonStringv(char *dest, const char minify, const JSON_Node *root, const void** keys);
+
+/*
+ *
+ *  ___ _   _ _____ _____ ____  _   _    _    _
+ * |_ _| \ | |_   _| ____|  _ \| \ | |  / \  | |
+ *  | ||  \| | | | |  _| | |_) |  \| | / _ \ | |
+ *  | || |\  | | | | |___|  _ <| |\  |/ ___ \| |___
+ * |___|_| \_| |_| |_____|_| \_\_| \_/_/   \_\_____|
+ *
+ *
+ * Everything below here refers to internal methods.
+ * Please use the above camelCased methods to interact with JSON data.
+ */
+
+JSON_Node *path_helperl(const JSON_Node *root, const char *key);
+JSON_Node *path_helperv(const JSON_Node *root, const void** keys);
 
 /*
  * Init pool
@@ -137,29 +354,29 @@ int destroy_pool(struct json_pool *pool);
 struct json_pool *double_pool(struct json_pool **pool);
 
 /*
- * New element
+ * New node
  */
-struct json_element *new_element(struct json_pool *pool);
+JSON_Node *new_node(struct json_pool *pool);
 
 /*
- * Destroy element
+ * Destroy node
  */
-struct json_element *destroy_element(struct json_pool *pool, struct json_element *elem);
+JSON_Node *destroy_node(struct json_pool *pool, JSON_Node *elem);
 
 /*
- * Array add element
+ * Array add node
  */
-int array_add_element(struct json_element *array, struct json_element *elem);
+int array_add_node(JSON_Node *array, JSON_Node *elem);
 
 /*
- * Array destroy element
+ * Array destroy node
  */
-int array_destroy_element(struct json_pool *pool, struct json_element *array, struct json_element *elem);
+int array_destroy_node(struct json_pool *pool, JSON_Node *array, JSON_Node *elem);
 
 /*
  * Array get nth
  */
-struct json_element *array_get_nth(struct json_element *array, size_t n);
+JSON_Node *array_get_nth(JSON_Node *array, size_t n);
 
 static inline int is_whitespace(char c);
 
@@ -182,34 +399,32 @@ static inline int is_json_array(char *str);
 
 static inline int is_json_object(char *str);
 
-int identify(char *str, struct json_element *elem);
+int identify(char *str, JSON_Node *elem);
 
-static inline enum json_literal get_json_literal(const char *ptr);
+static inline char get_json_literal(const char *ptr);
 
 char *get_json_str(struct queue *read, struct queue *scratch);
 
 static inline double get_json_num(char *str);
 
-struct json_element *get_json_array(struct queue *file, struct queue *scratch, struct json_element *elem);
+JSON_Node *get_json_array(struct queue *file, struct queue *scratch, JSON_Node *elem);
 
-struct json_element *get_json_object(struct queue *file, struct queue *scratch, struct json_element *elem);
+JSON_Node *get_json_object(struct queue *file, struct queue *scratch, JSON_Node *elem);
 
-struct json_element *process(struct queue *file, struct json_element *elem);
+JSON_Node *process(struct queue *file, JSON_Node *elem);
 
-struct json_element *copy_json_array(struct json_element *dest, struct json_element *src);
+JSON_Node *copy_json_array(JSON_Node *dest, JSON_Node *src);
 
 uint64_t fnv(const char *data, size_t len);
 static inline uint64_t fnv_str(const char *data);
 
-struct json_element *ht_insert(struct ht *table, char *key, struct json_element *val) ;
-struct json_element *ht_insert_direct(struct ht *table, char *key, struct json_element *val);
-struct json_element *ht_find(struct ht *table, char *key);
-struct json_element *ht_set(struct ht *table, char *key, struct json_element *elem);
-struct json_element *ht_del(struct json_pool *pool, struct ht *table, const char *key);
+JSON_Node *ht_insert(struct ht *table, char *key, JSON_Node *val) ;
+JSON_Node *ht_insert_direct(struct ht *table, char *key, JSON_Node *val);
+JSON_Node *ht_find(struct ht *table, char *key);
+JSON_Node *ht_set(struct ht *table, char *key, JSON_Node *elem);
+JSON_Node *ht_del(struct json_pool *pool, struct ht *table, const char *key);
 struct ht *ht_grow(struct ht *old, size_t cap);
 void ht_destroy(struct json_pool *pool, struct ht *table);
-
-struct json_element;
 
 void read_tests();
 void array_tests();
