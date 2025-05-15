@@ -1,3 +1,2 @@
-* Create functions that properly copy strings, arrays, and hashmaps (recursively i.e. deep copy).
-
-Once I have hashmaps working the "core" functionality is there and I just need to think about how to provide a useful interface. No user should need to provide a pointer to the elements pool, for example, because it is an internal construct.
+* Get interface working
+* Redo so errors work

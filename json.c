@@ -56,7 +56,7 @@ JSON_Node *jsonOpen(const char *fileName) {
 
   file = fopen(fileName, "r");
   if (file == NULL) {
-      free(new);
+    free(new);
     return NULL;
   }
 
@@ -750,9 +750,9 @@ JSON_Node *get_json_object(struct queue *file, struct queue *scratch,
   keys = calloc(OBJECT_STARTING_SIZE, sizeof(char *));
   vals = calloc(OBJECT_STARTING_SIZE, sizeof(JSON_Node *));
   if (table == NULL || keys == NULL || vals == NULL) {
-      free(table);
-      free(keys);
-      free(vals);
+    free(table);
+    free(keys);
+    free(vals);
     return NULL;
   }
   table->keys = keys;
@@ -930,9 +930,9 @@ JSON_Node *copy_json_node(JSON_Node *dest, JSON_Node *src) {
     keys = calloc(OBJECT_STARTING_SIZE, sizeof(char *));
     vals = calloc(OBJECT_STARTING_SIZE, sizeof(JSON_Node *));
     if (table == NULL || keys == NULL || vals == NULL) {
-        free(table);
-        free(keys);
-        free(vals);
+      free(table);
+      free(keys);
+      free(vals);
       return NULL;
     }
     memset(dest, 0, sizeof(JSON_Node));
@@ -1178,9 +1178,9 @@ struct ht *ht_grow(struct ht *old, size_t cap) {
   JSON_Node **new_vals = calloc(cap, sizeof(JSON_Node *));
   size_t i = 0;
   if (new == NULL || new_keys == NULL || new_vals == NULL) {
-      free(new);
-      free(new_keys);
-      free(new_vals);
+    free(new);
+    free(new_keys);
+    free(new_vals);
     return NULL;
   }
   new->keys = new_keys;

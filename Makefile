@@ -10,6 +10,9 @@ ANALYZE_CLANG=-analyze-headers
 
 DEPENDS=*.c *.h
 
+clean:
+	rm -f json tags *.ast *.pch *.plist externalDefMap.txt
+
 release: ${DEPENDS}
 	${CC} ${CFLAGS} ${OPTIMIZE} json.c -o json
 
@@ -38,13 +41,6 @@ test: ${DEPENDS}
 ifeq (${TAGS},y)
 	@ctags -R .
 endif
-	clang ${START_SMALL} ${TEST_BUILD} -emit-ast json.c json.h queue.h
-	clang-extdef-mapping -p . json.c json.h queue.h | sed 's/\.c/\.ast/' | sed 's/\.h/\.h\.pch/g' | sed "s|$(pwd)/||g" > externalDefMap.txt
-	clang --analyze ${START_SMALL} ${TEST_BUILD} \
-		-Xclang -analyzer-config -Xclang experimental-enable-naive-ctu-analysis=true \
-		-Xclang -analyzer-config -Xclang ctu-dir=. \
-		-Xclang -analyzer-output=plist-multi-file \
-		json.c json.h queue.h
 	@echo '================================='
 	clang ${CFLAGS} ${DEBUG} ${START_SMALL} ${TEST_BUILD} -fsanitize=address -fsanitize=undefined -fsanitize=leak json.c -o json
 	@echo '================================='
@@ -58,3 +54,10 @@ endif
 	@echo '================================='
 	@./json
 	@echo '================================='
+	clang ${START_SMALL} ${TEST_BUILD} -emit-ast json.c json.h queue.h
+	clang-extdef-mapping -p . json.c json.h queue.h | sed 's/\.c/\.ast/' | sed 's/\.h/\.h\.pch/g' | sed "s|$(pwd)/||g" > externalDefMap.txt
+	clang --analyze ${START_SMALL} ${TEST_BUILD} \
+		-Xclang -analyzer-config -Xclang experimental-enable-naive-ctu-analysis=true \
+		-Xclang -analyzer-config -Xclang ctu-dir=. \
+		-Xclang -analyzer-output=plist-multi-file \
+		json.c json.h queue.h
