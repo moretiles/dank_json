@@ -18,3 +18,9 @@ tags
 json
 atod.c
 atod
+
+# clang static test files
+*.ast
+*.h.pch
+*.plist
+externalDefMap.txt

@@ -1,8 +1,2 @@
-FROM docker.io/library/debian:unstable
-RUN apt-get update -y && \
-        apt-get -y install --no-install-recommends tmux screen git vim bash apt-utils curl wget procps pre-commit \
-        make cmake build-essential gcc g++-multilib ragel graphviz locales universal-ctags && \
-        useradd -u 1000 -s /bin/bash dev && \
-        mkdir -p /home/dev && \
-        chown -R dev:dev /home/dev
-USER dev
+FROM mcr.microsoft.com/devcontainers/base:debian
+RUN apt-get update -y && apt-get -y install clang make cmake build-essential ragel graphviz locales && rm -rf /var/lib/apt/lists/*
