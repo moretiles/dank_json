@@ -1,5 +1,8 @@
 {
     "name": "dank-json",
     "dockerFile": "Dockerfile",
-    "init": true
+    "init": true,
+    "features": {
+        "./features/baseline": {}
+    }
 }
