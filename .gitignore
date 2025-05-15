@@ -11,6 +11,9 @@ Sessionx.vim
 tags
 [._]*.un~
 
+# b4
+.b4.lock
+
 # C tmp files
 .gdb_history
 
