@@ -1,2 +1,6 @@
-* Get interface working
-* Redo so errors work
+* Get interface working.
+
+* Make sure JSON dictionaries are sorted in the same order as input.
+* Add error queue.
+* Use wchar_t for strings to properly handle 2 byte escapes (like \xabcd).
+* Use global zero initialized node to populate initial dictionary so we only "waste" memory on pointers, not nodes

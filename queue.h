@@ -109,6 +109,19 @@ int enqueuec(struct queue *store, char c) {
   return 0;
 }
 
+// Enqueue a single byte to store->chars
+int enqueuecn(struct queue *store, char c, long n) {
+  if (store->pos + n > store->cap) {
+    return ERR_QUEUE_OUT_OF_MEMORY;
+  }
+
+  if (memset((store->chars + store->pos), c, n) == NULL) {
+    return ERR_QUEUE_OUT_OF_MEMORY;
+  }
+  store->pos = store->pos + n;
+  return 0;
+}
+
 // Copy from store->chars over [base, pos) to start of store->chars
 int foldDown(struct queue *store) {
   int diff = store->pos - store->base;
