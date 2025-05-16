@@ -6,6 +6,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if TEST_BUILD == 1
+#include <fcntl.h>
+#include <unistd.h>
+#endif
+
 #include "queue.h"
 
 /*
@@ -314,7 +319,9 @@ size_t jsonStrlenv(JSON_Node *root, struct path **keys);
  * If min is anything other than 0 then we minify the output so there is no
  * whitespace.
  */
-char *jsonString(char *dest, const char minify, const JSON_Node *elem);
+int jsonString(FILE *dest, char minify, JSON_Node *elem);
+int jsonStringRecurse(struct queue *dest, char minify, int offset,
+                      JSON_Node *elem);
 
 /*
  * Write the node `elem` as a JSON string to `dest`.
@@ -325,8 +332,8 @@ char *jsonString(char *dest, const char minify, const JSON_Node *elem);
  * The function is smart to figure out whether you want to access a key or
  * index.
  */
-char *jsonStringl(char *dest, const char minify, const JSON_Node *root,
-                  const char *first, ...);
+#define jsonStringl(dest, minify, root, args...)                               \
+  jsonString(dest, minify, jsonReadl(root, ##args))
 
 /*
  * Write the node `elem` as a JSON string to `dest`.
@@ -337,8 +344,7 @@ char *jsonStringl(char *dest, const char minify, const JSON_Node *root,
  * The function is smart to figure out whether you want to access a key or
  * index.
  */
-char *jsonStringv(char *dest, const char minify, const JSON_Node *root,
-                  const void **keys);
+int jsonStringv(FILE *dest, char minify, JSON_Node *root, struct path **keys);
 
 /*
  *
