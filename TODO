@@ -1,4 +1,10 @@
-* Get interface working.
+Progress map
+
+* Add function to read in singletons like int jsonVal(JSON_Node root, *dest)
+* Add function to modify existing node that takes in value and type.
+* Reconsider whether some functions should have *l/*v variants.
+
+CORE FUNCTIONALITY WORKING
 
 * Make sure JSON dictionaries are sorted in the same order as input.
 * Make sure we allocate dictionaries using a pool.

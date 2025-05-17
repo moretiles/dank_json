@@ -205,7 +205,7 @@ JSON_Node *jsonCreatel(JSON_Node *node, JSON_Node *root, ...);
  * The function is smart to figure out whether you want to access a key or
  * index.
  */
-JSON_Node *jsonCreatev(JSON_Node *root, JSON_Node *node, const void **keys);
+JSON_Node *jsonCreatev(JSON_Node *node, JSON_Node *root, struct path **keys);
 
 /*
  * Returns the node at the provided path below the `root`.
@@ -262,7 +262,7 @@ JSON_Node *jsonUpdate(JSON_Node *src, JSON_Node *root);
  * The function is smart to figure out whether you want to access a key or
  * index.
  */
-#define jsonUpdatel(src, root, args...) jsonUpdatel(src, jsonReadl(root, ##args))
+#define jsonUpdatel(src, root, args...) jsonUpdate(src, jsonReadl(root, ##args))
 
 /*
  * Updates the provided node `elem` to be type `type` and hold value `val`.
