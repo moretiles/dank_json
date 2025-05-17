@@ -7,11 +7,13 @@
 #include <string.h>
 
 #if TEST_BUILD == 1
+#include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
 #endif
 
 #include "queue.h"
+#include "cstring.h"
 
 /*
  * json node flags
@@ -359,104 +361,43 @@ int jsonStringv(FILE *dest, char minify, JSON_Node *root, struct path **keys);
  * Please use the above camelCased methods to interact with JSON data.
  */
 
-/*
- * Init pool
- */
+// pool
 int init_pool(struct json_pool *pool, size_t size);
-
-/*
- * Destroy pool
- */
 int destroy_pool(struct json_pool *pool);
-
-/*
- * Double pool
- */
 struct json_pool *double_pool(struct json_pool **pool);
 
-/*
- * New node
- */
-JSON_Node *new_node(struct json_pool *pool);
-
-/*
- * Copy
- */
-JSON_Node *copy_json_node(JSON_Node *dest, JSON_Node *src);
-
-/*
- * Destroy node
- */
-JSON_Node *destroy_node(struct json_pool *pool, JSON_Node *elem);
-
-/*
- * Array insert node
- */
-int array_insert_node(JSON_Node *array, JSON_Node *elem, size_t pos);
-
-/*
- * Array add node
- */
-int array_add_node(JSON_Node *array, JSON_Node *elem);
-
-/*
- * Array insert node
- */
-int array_insert_node(JSON_Node *array, JSON_Node *elem, size_t pos);
-
-/*
- * Array destroy node
- */
-int array_destroy_node(struct json_pool *pool, JSON_Node *array,
-                       JSON_Node *elem);
-
-/*
- * Array get nth
- */
-JSON_Node *array_get_nth(JSON_Node *array, size_t n);
-
+// internal JSON_Node functions
 static inline int is_whitespace(char c);
-
 void get_next(char *outer, struct queue *store);
-
-/*
- * Return first non-whitespace character
- */
 static inline char get_sep(struct queue *store);
-
 static inline int is_json_literal(char *str);
-
 static inline int is_json_str(char *str);
-
 static inline int is_part_of_num(char c);
-
 int is_json_num(char *str);
-
 static inline int is_json_array(char *str);
-
 static inline int is_json_object(char *str);
-
 int identify(char *str, JSON_Node *elem);
-
 static inline char get_json_literal(const char *ptr);
-
 char *get_json_str(struct queue *read, struct queue *scratch);
-
 static inline double get_json_num(char *str);
-
-JSON_Node *get_json_array(struct queue *file, struct queue *scratch,
-                          JSON_Node *elem);
-
-JSON_Node *get_json_object(struct queue *file, struct queue *scratch,
-                           JSON_Node *elem);
-
+JSON_Node *new_node(struct json_pool *pool);
+JSON_Node *copy_json_node(JSON_Node *dest, JSON_Node *src);
+JSON_Node *destroy_node(struct json_pool *pool, JSON_Node *elem);
 JSON_Node *process(struct queue *file, JSON_Node *elem);
 
+// array
+int array_insert_node(JSON_Node *array, JSON_Node *elem, size_t pos);
+int array_add_node(JSON_Node *array, JSON_Node *elem);
+int array_insert_node(JSON_Node *array, JSON_Node *elem, size_t pos);
+int array_destroy_node(struct json_pool *pool, JSON_Node *array,
+                       JSON_Node *elem);
+JSON_Node *array_get_nth(JSON_Node *array, size_t n);
 JSON_Node *copy_json_array(JSON_Node *dest, JSON_Node *src);
+JSON_Node *get_json_array(struct queue *file, struct queue *scratch, JSON_Node *elem);
 
+// hash table
 uint64_t fnv(const char *data, size_t len);
 static inline uint64_t fnv_str(const char *data);
-
 JSON_Node *ht_insert(struct ht *table, char *key, JSON_Node *val);
 JSON_Node *ht_insert_direct(struct ht *table, char *key, JSON_Node *val);
 JSON_Node *ht_find(struct ht *table, char *key);
@@ -464,6 +405,7 @@ JSON_Node *ht_set(struct ht *table, char *key, JSON_Node *elem);
 JSON_Node *ht_del(struct json_pool *pool, struct ht *table, const char *key);
 struct ht *ht_grow(struct ht *old, size_t cap);
 void ht_destroy(struct json_pool *pool, struct ht *table);
+JSON_Node *get_json_object(struct queue *file, struct queue *scratch, JSON_Node *elem);
 
 void read_tests();
 void array_tests();

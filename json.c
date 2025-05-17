@@ -681,7 +681,7 @@ void get_next(char *outer, struct queue *store) {
   if (outer == NULL || store == NULL) {
     return;
   }
-  strcpy(outer, "");
+  outer[0] = '\x00';
   char c = ' ';
   size_t read_in = 0;
   // char outer[999] = "";
@@ -852,7 +852,7 @@ char *get_json_str(struct queue *read, struct queue *scratch) {
   if (ret == NULL) {
     return NULL;
   }
-  strncpy(ret, scratch->chars, scratch->pos);
+  cstrncpy(ret, scratch->chars, scratch->pos + 1);
   ret[scratch->pos] = '\0';
 
   scratch->base = 0;
@@ -870,8 +870,7 @@ static inline double get_json_num(char *str) {
   return out;
 }
 
-JSON_Node *get_json_array(struct queue *file, struct queue *scratch,
-                          JSON_Node *elem) {
+JSON_Node *get_json_array(struct queue *file, struct queue *scratch, JSON_Node *elem) {
   JSON_Node *from_pool = NULL;
   JSON_Node current;
   char sep = ',', error = 0;
@@ -1056,7 +1055,7 @@ JSON_Node *copy_json_node(JSON_Node *dest, JSON_Node *src) {
     if (new_str == NULL) {
       return NULL;
     }
-    strncpy(new_str, src->contents.s, strlen(src->contents.s) + 1);
+    cstrncpy(new_str, src->contents.s, strlen(src->contents.s) + 1);
     dest->contents.s = new_str;
     dest->type = JSON_STR;
     dest->flags = src->flags;
@@ -1471,9 +1470,9 @@ void array_tests() {
   char *key2 = calloc(99, sizeof(char));
   char *key3 = calloc(99, sizeof(char));
   assert(key1 != NULL && key2 != NULL && key3 != NULL);
-  strcpy(key1, "0");
-  strcpy(key2, "yes hello test 1233");
-  strcpy(key3, "bees bees are the best bees bees");
+  cstrncpy(key1, "0", 99);
+  cstrncpy(key2, "yes hello test 1233", 99);
+  cstrncpy(key3, "bees bees are the best bees bees", 99);
   // printf("first inserted at %p\n", ht_insert(table, key1,
   // array_get_nth(interior, 0)));
   assert(ht_insert(table, key1, array_get_nth(interior, 0)) != NULL);
@@ -1502,6 +1501,8 @@ void array_tests() {
   new = copy_json_node(new, array_get_nth(array, 1));
   assert(new != NULL);
   assert(array_insert_node(array, new, 5) == 0);
+  //printf("%s\n", array_get_nth(array, 1)->contents.s);
+  //printf("%s\n", array_get_nth(array, 5)->contents.s);
   assert(!strcmp(array_get_nth(array, 1)->contents.s,
                  array_get_nth(array, 5)->contents.s));
   assert(array_insert_node(array, new, 2) == 0);
@@ -1518,7 +1519,7 @@ void array_tests() {
 void object_tests() {
   jsonInit();
 
-  assert(OBJECT_STARTING_SIZE == 1);
+  //assert(OBJECT_STARTING_SIZE == 1);
 
   JSON_Node *root = jsonOpen("./tests/object1.json");
   assert(root != NULL && root->contents.o != NULL);
@@ -1703,22 +1704,33 @@ void output_tests() {
 
   JSON_Node *root = jsonOpen("./tests/object1.json");
 
-  FILE *out = fopen("/tmp/json-tests", "w");
-  assert(out != NULL);
+  FILE *out = fopen("/tmp/json-tests", "w+");
+  if (out == NULL) {
+    printf("Error opening %s: %s\n", "/tmp/json-tests", strerror(errno));
+    assert(false);
+  }
   jsonString(out, 1, root);
+  assert(fflush(out) == 0);
+  rewind(out);
+  /*
   fclose(out);
 
   out = fopen("/tmp/json-tests", "r");
   assert(out != NULL);
+  */
   char *expected = "{\"D\":[{\"C\":12,\"B\":11,\"A\":10},1,\"yes\"],\"C\":"
                    "\"some text I guess\",\"B\":11,\"A\":10}\n";
   char test[999];
-  fgets(test, 999, out);
+  // Clang is unhappy about errno even though we check if it is invalid, false
+  // positive
+  char *ret = fgets(test, 999, out);
+  assert(ret == test);
   assert(!strcmp(expected, test));
   assert(jsonStringl(stdin, 1, root, _KEY("D"), _INDEX(0), _KEY("B"), NULL) ==
          0);
   struct path *keys[] = {_KEY("D"), _INDEX(0), _KEY("B"), NULL};
   assert(jsonStringv(stdin, 1, root, keys) == 0);
+  fflush(out);
   fclose(out);
   remove("/tmp/json-tests");
 

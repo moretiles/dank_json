@@ -27,3 +27,6 @@ atod
 *.h.pch
 *.plist
 externalDefMap.txt
+
+# gprof
+gmon.out
