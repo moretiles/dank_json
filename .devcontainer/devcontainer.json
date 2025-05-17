@@ -1,9 +1,0 @@
-{
-    "name": "dank-json",
-    "dockerFile": "Dockerfile",
-    "init": true,
-    "privileged": true,
-    "features": {
-        "./features/baseline": {}
-    }
-}

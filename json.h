@@ -12,8 +12,8 @@
 #include <unistd.h>
 #endif
 
-#include "queue.h"
 #include "cstring.h"
+#include "queue.h"
 
 /*
  * json node flags
@@ -168,11 +168,14 @@ int jsonEnd();
  */
 
 // struct path *_KEY(char* key);
+#define _KEY(k)                                                                \
+  &((struct path){.path.key = k, .type = JSON_OBJECT, .next = NULL})
 
 /*
  * Expresses an offset as an index to be used when accessing an array's fields.
  */
-// struct path *_INDEX(const size_t index);
+#define _INDEX(i)                                                              \
+  &((struct path){.path.index = i, .type = JSON_ARRAY, .next = NULL})
 
 /*
  * Provides you with a new node.
@@ -250,7 +253,7 @@ JSON_Node *jsonCopyv(JSON_Node *root, struct path **keys);
 /*
  * Updates the provided node `elem` to be type `type` and hold value `val`.
  */
-JSON_Node *jsonUpdate(void *val, char type, JSON_Node *root);
+JSON_Node *jsonUpdate(JSON_Node *src, JSON_Node *root);
 
 /*
  * Updates the provided node `elem` to be type `type` and hold value `val`.
@@ -259,7 +262,7 @@ JSON_Node *jsonUpdate(void *val, char type, JSON_Node *root);
  * The function is smart to figure out whether you want to access a key or
  * index.
  */
-JSON_Node *jsonUpdatel(void *val, char type, JSON_Node *root, ...);
+#define jsonUpdatel(src, root, args...) jsonUpdatel(src, jsonReadl(root, ##args))
 
 /*
  * Updates the provided node `elem` to be type `type` and hold value `val`.
@@ -268,7 +271,7 @@ JSON_Node *jsonUpdatel(void *val, char type, JSON_Node *root, ...);
  * The function is smart to figure out whether you want to access a key or
  * index.
  */
-JSON_Node *jsonUpdatev(void *val, char type, JSON_Node *root, void **keys);
+JSON_Node *jsonUpdatev(JSON_Node *src, JSON_Node *root, struct path **keys);
 
 /*
  * Deletes the node `elem`.
@@ -282,7 +285,7 @@ JSON_Node *jsonDelete(JSON_Node *elem);
  * The function is smart to figure out whether you want to access a key or
  * index.
  */
-JSON_Node *jsonDeletel(JSON_Node *root, const char *first, ...);
+#define jsonDeletel(root, args...) jsonDelete(jsonReadl(root, ##args))
 
 /*
  * Deletes the node `elem`.
@@ -291,7 +294,7 @@ JSON_Node *jsonDeletel(JSON_Node *root, const char *first, ...);
  * The function is smart to figure out whether you want to access a key or
  * index.
  */
-JSON_Node *jsonDeletev(JSON_Node *root, const void **keys);
+JSON_Node *jsonDeletev(JSON_Node *root, struct path **keys);
 
 /*
  * Gets the length of the string held by the node `root`.
@@ -393,7 +396,8 @@ int array_destroy_node(struct json_pool *pool, JSON_Node *array,
                        JSON_Node *elem);
 JSON_Node *array_get_nth(JSON_Node *array, size_t n);
 JSON_Node *copy_json_array(JSON_Node *dest, JSON_Node *src);
-JSON_Node *get_json_array(struct queue *file, struct queue *scratch, JSON_Node *elem);
+JSON_Node *get_json_array(struct queue *file, struct queue *scratch,
+                          JSON_Node *elem);
 
 // hash table
 uint64_t fnv(const char *data, size_t len);
@@ -405,7 +409,8 @@ JSON_Node *ht_set(struct ht *table, char *key, JSON_Node *elem);
 JSON_Node *ht_del(struct json_pool *pool, struct ht *table, const char *key);
 struct ht *ht_grow(struct ht *old, size_t cap);
 void ht_destroy(struct json_pool *pool, struct ht *table);
-JSON_Node *get_json_object(struct queue *file, struct queue *scratch, JSON_Node *elem);
+JSON_Node *get_json_object(struct queue *file, struct queue *scratch,
+                           JSON_Node *elem);
 
 void read_tests();
 void array_tests();
