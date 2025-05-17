@@ -1,0 +1,11 @@
+"services":
+  "dank_json":
+    "container_name": "dank_json"
+    "build":
+      "context": "."
+      "dockerfile": "Dockerfile.devenv"
+    "volumes":
+      - ".:/devenv"
+    "privileged": true
+    "command": "sleep 99999d"
+    "working_dir": "/devenv"
