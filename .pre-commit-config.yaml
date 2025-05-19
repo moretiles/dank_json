@@ -3,3 +3,7 @@ repos:
     rev: v8.24.2
     hooks:
       - id: gitleaks
+  - repo: https://github.com/moretiles/b4
+    rev: 0c8d31eced780b70b46a9b6acdb3372014fc1ae8
+    hooks:
+      - id: moretiles-b4

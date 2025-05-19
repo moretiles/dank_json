@@ -1,4 +1,10 @@
-* Get interface working.
+Progress map
+
+* Add in shallow copy and depp copy variants.
+* Reconsider whether some functions should have *l/*v variants.
+* Give structs better names in the public interface
+
+CORE FUNCTIONALITY WORKING
 
 * Make sure JSON dictionaries are sorted in the same order as input.
 * Make sure we allocate dictionaries using a pool.

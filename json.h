@@ -1,12 +1,11 @@
-#include <assert.h>
 #include <stdarg.h>
-#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #if TEST_BUILD == 1
+#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -141,27 +140,10 @@ struct path {
   struct path *next;
 };
 
-/*
- * Initializes this library.
- */
-int jsonInit();
-
-/*
- * Opens `filename` and returns root of the JSON document.
- * Fails if the JSON document provided is invalid.
- */
+int jsonLibInit();
 JSON_Node *jsonOpen(const char *fileName);
-
-/*
- * Closes `filename` terminating all associated nodes.
- * Shallow copied nodes derived from members of the file are also terminated.
- */
 void jsonClose(const char *fileName);
-
-/*
- * Terminates all resources used by this library.
- */
-int jsonEnd();
+int jsonLibEnd();
 
 /*
  * Expresses a string as a key to be used when accessing a object's fields.
@@ -187,168 +169,57 @@ int jsonEnd();
  * 2. Calling jsonClose on the file associated with this node.
  * 3. Calling jsonEnd.
  */
-JSON_Node *jsonNew();
+JSON_Node *jsonCreate();
+//JSON_Node *jsonCreatets(void *src, char type);
+JSON_Node *jsonCreatetd(void *src, char type);
+//JSON_Node *jsonCreatensl(JSON_Node *node, JSON_Node *root, ...);
+JSON_Node *jsonCreatendl(JSON_Node *node, JSON_Node *root, ...);
+//JSON_Node *jsonCreatensv(JSON_Node *node, JSON_Node *root, struct path **keys);
+JSON_Node *jsonCreatendv(JSON_Node *node, JSON_Node *root, struct path **keys);
+//JSON_Node *jsonCreatetsl(void *src, char type, JSON_Node *root, ...);
+//JSON_Node *jsonCreatetdl(void *src, char type, JSON_Node *root, ...);
+//JSON_Node *jsonCreatetsv(void *src, char type, JSON_Node *root, struct path **keys);
+//JSON_Node *jsonCreatetdv(void *src, char type, JSON_Node *root, struct path **keys);
 
-/*
- * Creates a new node under `root` with the type `type` and the value `val`.
- *
- * Paths are given execl style.
- * The function is smart to figure out whether you want to access a key or
- * index.
- */
-JSON_Node *jsonCreatel(JSON_Node *node, JSON_Node *root, ...);
+// shallow and deep
+JSON_Node *jsonReadnd(JSON_Node *elem);
+JSON_Node *jsonReadnsl(JSON_Node *root, ...);
+JSON_Node *jsonReadnsv(JSON_Node *root, struct path **keys);
+#define jsonReadndl(root, args...) jsonReadnd(jsonReadnsl(root, ##args))
+JSON_Node *jsonReadndv(JSON_Node *root, struct path **keys);
+JSON_Node *jsonReadnd(JSON_Node *elem);
+int jsonReadtd(void *dest, char type, JSON_Node *root);
+#define jsonReadtdl(dest, type, root, args...)                                   \
+  jsonReadtd(dest, type, jsonReadnsl(root, ##args))
+int jsonReadtdv(void *dest, char type, JSON_Node *root, struct path **keys);
 
-/*
- * Creates a new node under `root` with the type `type` and the value `val`.
- *
- * Paths are given execv style.
- * The function is smart to figure out whether you want to access a key or
- * index.
- */
-JSON_Node *jsonCreatev(JSON_Node *root, JSON_Node *node, const void **keys);
+// update
+JSON_Node *jsonUpdatend(JSON_Node *src, JSON_Node *root);
+#define jsonUpdatendl(src, root, args...) jsonUpdatend(src, jsonReadnsl(root, ##args))
+JSON_Node *jsonUpdatendv(JSON_Node *src, JSON_Node *root, struct path **keys);
+int jsonUpdatetd(void *src, char type, JSON_Node *root);
+#define jsonUpdatetdl(src, type, root, args...)                                     \
+  jsonUpdatetd(src, type, jsonReadnsl(root, ##args))
+int jsonUpdatetdv(void *src, char type, JSON_Node *root, struct path **keys);
+//JSON_Node *jsonUpdatetd(JSON_Node *src, JSON_Node *root);
+//#define jsonUpdatetdl(src, root, args...) jsonUpdatetd(src, jsonReadnsl(root, ##args))
+//JSON_Node *jsonUpdatetdv(JSON_Node *src, JSON_Node *root, struct path **keys);
+//int jsonUpdatetd(void *src, char type, JSON_Node *root);
+//#define jsonUpdatetdl(src, type, root, args...)                                     \
+//  jsonUpdatetd(src, type, jsonReadnsl(root, ##args))
+//int jsonUpdatetdv(void *src, char type, JSON_Node *root, struct path **keys);
 
-/*
- * Returns the node at the provided path below the `root`.
- *
- * Paths are given execl style.
- * The function is smart to figure out whether you want to access a key or
- * index.
- */
-JSON_Node *jsonReadl(JSON_Node *root, ...);
-
-/*
- * Returns the node at the provided path below the `root`.
- *
- * Paths are given execv style.
- * The function is smart to figure out whether you want to access a key or
- * index.
- */
-JSON_Node *jsonReadv(JSON_Node *root, struct path **keys);
-
-/*
- * Returns a deep copy of the node `elem` and its child nodes.
- */
-JSON_Node *jsonCopy(JSON_Node *elem);
-
-/*
- * Returns a deep copy of the node and its child nodes at the provided path
- * below the `root`.
- *
- * Paths are given execl style.
- * The function is smart to figure out whether you want to access a key or
- * index.
- */
-#define jsonCopyl(root, args...) jsonCopy(jsonReadl(root, ##args))
-
-/*
- * Returns a deep copy of the node and its child nodes at the provided path
- * below the `root`.
- *
- * Paths are given execv style.
- * The function is smart to figure out whether you want to access a key or
- * index.
- */
-JSON_Node *jsonCopyv(JSON_Node *root, struct path **keys);
-
-/*
- * Updates the provided node `elem` to be type `type` and hold value `val`.
- */
-JSON_Node *jsonUpdate(JSON_Node *src, JSON_Node *root);
-
-/*
- * Updates the provided node `elem` to be type `type` and hold value `val`.
- *
- * Paths are given execl style.
- * The function is smart to figure out whether you want to access a key or
- * index.
- */
-#define jsonUpdatel(src, root, args...) jsonUpdatel(src, jsonReadl(root, ##args))
-
-/*
- * Updates the provided node `elem` to be type `type` and hold value `val`.
- *
- * Paths are given execv style.
- * The function is smart to figure out whether you want to access a key or
- * index.
- */
-JSON_Node *jsonUpdatev(JSON_Node *src, JSON_Node *root, struct path **keys);
-
-/*
- * Deletes the node `elem`.
- */
+// delete
 JSON_Node *jsonDelete(JSON_Node *elem);
-
-/*
- * Deletes the node `elem`.
- *
- * Paths are given execl style.
- * The function is smart to figure out whether you want to access a key or
- * index.
- */
-#define jsonDeletel(root, args...) jsonDelete(jsonReadl(root, ##args))
-
-/*
- * Deletes the node `elem`.
- *
- * Paths are given execv style.
- * The function is smart to figure out whether you want to access a key or
- * index.
- */
+#define jsonDeletel(root, args...) jsonDelete(jsonReadnsl(root, ##args))
 JSON_Node *jsonDeletev(JSON_Node *root, struct path **keys);
 
-/*
- * Gets the length of the string held by the node `root`.
- */
-size_t jsonStrlen(JSON_Node *root);
-
-/*
- * Gets the length of the string held by the node `root`.
- *
- * Paths are given execl style.
- * The function is smart to figure out whether you want to access a key or
- * index.
- */
-#define jsonStrlenl(root, args...) jsonStrlen(jsonReadl(root, ##args))
-
-/*
- * Gets the length of the string held by the node `root`.
- *
- * Paths are given execv style.
- * The function is smart to figure out whether you want to access a key or
- * index.
- */
-size_t jsonStrlenv(JSON_Node *root, struct path **keys);
-
-/*
- * Write the node `elem` as a JSON string to `dest`.
- * If min is anything other than 0 then we minify the output so there is no
- * whitespace.
- */
+// output json structure and children as string
 int jsonString(FILE *dest, char minify, JSON_Node *elem);
 int jsonStringRecurse(struct queue *dest, char minify, int offset,
                       JSON_Node *elem);
-
-/*
- * Write the node `elem` as a JSON string to `dest`.
- * If min is anything other than 0 then we minify the output so there is no
- * whitespace.
- *
- * Paths are given execl style.
- * The function is smart to figure out whether you want to access a key or
- * index.
- */
 #define jsonStringl(dest, minify, root, args...)                               \
-  jsonString(dest, minify, jsonReadl(root, ##args))
-
-/*
- * Write the node `elem` as a JSON string to `dest`.
- * If min is anything other than 0 then we minify the output so there is no
- * whitespace.
- *
- * Paths are given execv style.
- * The function is smart to figure out whether you want to access a key or
- * index.
- */
+  jsonString(dest, minify, jsonReadnsl(root, ##args))
 int jsonStringv(FILE *dest, char minify, JSON_Node *root, struct path **keys);
 
 /*
