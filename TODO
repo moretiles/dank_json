@@ -1,8 +1,8 @@
 Progress map
 
-* Add function to read in singletons like int jsonVal(JSON_Node root, *dest)
-* Add function to modify existing node that takes in value and type.
+* Add in shallow copy and depp copy variants.
 * Reconsider whether some functions should have *l/*v variants.
+* Give structs better names in the public interface
 
 CORE FUNCTIONALITY WORKING
 
