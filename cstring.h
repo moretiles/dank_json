@@ -19,3 +19,11 @@ char *cstrncpy(char *dest, char *src, size_t m) {
   dest[m - 1] = '\x00';
   return dest;
 }
+
+void *cmemcpy(void *dest, const void *src, size_t count){
+  if(dest == NULL || src == NULL || count == 0){
+    return NULL;
+  }
+
+  return memcpy(dest, src, count);
+}
