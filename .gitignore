@@ -18,8 +18,10 @@ tags
 .gdb_history
 
 # build files
-json
+*.o
+*.a
 atod.c
+json
 atod
 
 # clang static test files
