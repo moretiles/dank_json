@@ -151,13 +151,13 @@ int jsonLibEnd();
 
 // struct path *_KEY(char* key);
 #define _KEY(k)                                                                \
-  &((struct path){.path.key = k, .type = JSON_OBJECT, .next = NULL})
+  &((struct path) {.path.key = k, .type = JSON_OBJECT, .next = NULL})
 
 /*
  * Expresses an offset as an index to be used when accessing an array's fields.
  */
 #define _INDEX(i)                                                              \
-  &((struct path){.path.index = i, .type = JSON_ARRAY, .next = NULL})
+  &((struct path) {.path.index = i, .type = JSON_ARRAY, .next = NULL})
 
 /*
  * Provides you with a new node.
@@ -170,24 +170,29 @@ int jsonLibEnd();
  * 3. Calling jsonEnd.
  */
 JSON_Node *jsonCreate();
-//JSON_Node *jsonCreatets(void *src, char type);
+JSON_Node *jsonCreatets(void *src, char type);
 JSON_Node *jsonCreatetd(void *src, char type);
-//JSON_Node *jsonCreatensl(JSON_Node *node, JSON_Node *root, ...);
+#define jsonCreatensl(root, args...) cmemcpy(node, jsonReadnsl(root, ##args), sizeof(JSON_Node))
 JSON_Node *jsonCreatendl(JSON_Node *node, JSON_Node *root, ...);
-//JSON_Node *jsonCreatensv(JSON_Node *node, JSON_Node *root, struct path **keys);
+JSON_Node *jsonCreatensv(JSON_Node *node, JSON_Node *root, struct path **keys);
 JSON_Node *jsonCreatendv(JSON_Node *node, JSON_Node *root, struct path **keys);
 //JSON_Node *jsonCreatetsl(void *src, char type, JSON_Node *root, ...);
 //JSON_Node *jsonCreatetdl(void *src, char type, JSON_Node *root, ...);
 //JSON_Node *jsonCreatetsv(void *src, char type, JSON_Node *root, struct path **keys);
 //JSON_Node *jsonCreatetdv(void *src, char type, JSON_Node *root, struct path **keys);
 
-// shallow and deep
+// read
 JSON_Node *jsonReadnd(JSON_Node *elem);
 JSON_Node *jsonReadnsl(JSON_Node *root, ...);
 JSON_Node *jsonReadnsv(JSON_Node *root, struct path **keys);
+JSON_Node *jsonReadnd(JSON_Node *elem);
 #define jsonReadndl(root, args...) jsonReadnd(jsonReadnsl(root, ##args))
 JSON_Node *jsonReadndv(JSON_Node *root, struct path **keys);
-JSON_Node *jsonReadnd(JSON_Node *elem);
+// ts* family expect a char**
+int jsonReadts(void *dest, char type, JSON_Node *root);
+#define jsonReadtsl(dest, type, root, args...)                                   \
+  jsonReadts(dest, type, jsonReadnsl(root, ##args))
+int jsonReadtsv(void *dest, char type, JSON_Node *root, struct path **keys);
 int jsonReadtd(void *dest, char type, JSON_Node *root);
 #define jsonReadtdl(dest, type, root, args...)                                   \
   jsonReadtd(dest, type, jsonReadnsl(root, ##args))
@@ -215,12 +220,12 @@ JSON_Node *jsonDelete(JSON_Node *elem);
 JSON_Node *jsonDeletev(JSON_Node *root, struct path **keys);
 
 // output json structure and children as string
-int jsonString(FILE *dest, char minify, JSON_Node *elem);
-int jsonStringRecurse(struct queue *dest, char minify, int offset,
+int jsonOut(FILE *dest, char minify, JSON_Node *elem);
+int jsonOutRecurse(struct queue *dest, char minify, int offset,
                       JSON_Node *elem);
-#define jsonStringl(dest, minify, root, args...)                               \
-  jsonString(dest, minify, jsonReadnsl(root, ##args))
-int jsonStringv(FILE *dest, char minify, JSON_Node *root, struct path **keys);
+#define jsonOutl(dest, minify, root, args...)                               \
+  jsonOut(dest, minify, jsonReadnsl(root, ##args))
+int jsonOutv(FILE *dest, char minify, JSON_Node *root, struct path **keys);
 
 /*
  *
