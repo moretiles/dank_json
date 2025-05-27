@@ -1,8 +1,7 @@
 Progress map
 
-* Add in shallow copy and depp copy variants.
-* Reconsider whether some functions should have *l/*v variants.
-* Give structs better names in the public interface
+* Write tests for the jsonCreate, jsonRead, jsonUpdate families.
+* Give structs better names in the public interface.
 
 CORE FUNCTIONALITY WORKING
 
