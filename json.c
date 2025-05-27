@@ -314,6 +314,16 @@ JsonNode *jsonReadndv(JsonNode *root, struct path **keys) {
   return jsonReadnd(jsonReadnsv(root, keys));
 }
 
+JsonNode *jsonCreatetsv(void *src, char type, JsonNode *root, struct path **keys) {
+  return jsonCreatensv(jsonCreatets(src, type), root, keys);
+}
+
+JsonNode *jsonCreatetdv(void *src, char type, JsonNode *root, struct path **keys) {
+  return jsonCreatensv(jsonCreatetd(src, type), root, keys);
+}
+
+JsonNode *jsonCreatetdv(void *src, char type, JsonNode *root, struct path **keys);
+
 int jsonReadts(void *dest, char type, JsonNode *root){
 	if (dest == NULL || root == NULL || root->type != type) {
     return -1;
@@ -420,8 +430,12 @@ JsonNode *jsonCreatendl(JsonNode *node, JsonNode *root, ...) {
   return new;
 }
 
+//JsonNode *jsonCreatensv(JsonNode *node, JsonNode *root, struct path **keys){
+//	return cmemcpy(node, jsonReadnsv(root, keys), sizeof(JsonNode));
+//}
+
 JsonNode *jsonCreatensv(JsonNode *node, JsonNode *root, struct path **keys){
-	return cmemcpy(node, jsonReadnsv(root, keys), sizeof(JsonNode));
+	return cmemcpy(node, jsonCreatendv(&((JsonNode) {.contents.a = NULL, .type = JSON_OBJECT, .next = NULL}), root, keys), sizeof(JsonNode));
 }
 
 JsonNode *jsonCreatendv(JsonNode *node, JsonNode *root, struct path **keys) {
@@ -570,6 +584,24 @@ int jsonUpdatetd(void *src, char type, JsonNode *root) {
 
 int jsonUpdatetdv(void *src, char type, JsonNode *root, struct path **keys) {
   return jsonReadtd(src, type, jsonReadnsv(root, keys));
+}
+
+JsonNode *jsonUpdatets(void *src, char type, JsonNode *root){
+  JsonNode *ret = NULL, *new = NULL;
+  new = jsonCreatets(src, type);
+  ret = cmemcpy(root, new, sizeof(JsonNode));
+  if(ret == NULL){
+    jsonDelete(new);
+  }
+  return ret;
+}
+
+JsonNode *jsonUpdatensv(JsonNode *src, JsonNode *root, struct path **keys){
+  return cmemcpy(jsonReadnsv(root, keys), src, sizeof(JsonNode));
+}
+
+JsonNode *jsonUpdatetsv(void *src, char type, JsonNode *root, struct path **keys){
+  return cmemcpy(jsonReadnsv(root, keys), jsonCreatets(src, type), sizeof(JsonNode));
 }
 
 int jsonReadtd(void *dest, char type, JsonNode *root) {

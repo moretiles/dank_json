@@ -56,14 +56,15 @@ int jsonLibEnd();
 JsonNode *jsonCreate();
 JsonNode *jsonCreatets(void *src, char type);
 JsonNode *jsonCreatetd(void *src, char type);
-#define jsonCreatensl(root, args...) cmemcpy(node, jsonReadnsl(root, ##args), sizeof(JsonNode))
-JsonNode *jsonCreatendl(JsonNode *node, JsonNode *root, ...);
+#define jsonCreatensl(root, args...) cmemcpy(node, jsonCreatndl(&((JsonNode) {.contents.a = NULL, .type = JSON_ARRAY, .flags = 0, .prev = NULL, .next = NULL}), root, ##args), sizeof(JsonNode))
 JsonNode *jsonCreatensv(JsonNode *node, JsonNode *root, struct path **keys);
+JsonNode *jsonCreatendl(JsonNode *node, JsonNode *root, ...);
 JsonNode *jsonCreatendv(JsonNode *node, JsonNode *root, struct path **keys);
-//JsonNode *jsonCreatetsl(void *src, char type, JsonNode *root, ...);
-//JsonNode *jsonCreatetdl(void *src, char type, JsonNode *root, ...);
-//JsonNode *jsonCreatetsv(void *src, char type, JsonNode *root, struct path **keys);
-//JsonNode *jsonCreatetdv(void *src, char type, JsonNode *root, struct path **keys);
+// both Createt* functions can leak memory
+#define jsonCreatetsl(src, type, root, args...) jsonCreatensl(jsonCreatets(src, type), root, ...)
+#define jsonCreatetdl(src, type, root, args...) jsonCreatensl(jsonCopy(src, type), root, ...)
+JsonNode *jsonCreatetsv(void *src, char type, JsonNode *root, struct path **keys);
+JsonNode *jsonCreatetdv(void *src, char type, JsonNode *root, struct path **keys);
 
 // read
 JsonNode *jsonReadnd(JsonNode *elem);
@@ -82,21 +83,21 @@ int jsonReadtd(void *dest, char type, JsonNode *root);
   jsonReadtd(dest, type, jsonReadnsl(root, ##args))
 int jsonReadtdv(void *dest, char type, JsonNode *root, struct path **keys);
 
+// bad interface for update method methods ts/tsv return JsonNode* while td/tdv return int
 // update
+int jsonUpdatetd(void *src, char type, JsonNode *root);
 JsonNode *jsonUpdatend(JsonNode *src, JsonNode *root);
 #define jsonUpdatendl(src, root, args...) jsonUpdatend(src, jsonReadnsl(root, ##args))
 JsonNode *jsonUpdatendv(JsonNode *src, JsonNode *root, struct path **keys);
-int jsonUpdatetd(void *src, char type, JsonNode *root);
 #define jsonUpdatetdl(src, type, root, args...)                                     \
   jsonUpdatetd(src, type, jsonReadnsl(root, ##args))
 int jsonUpdatetdv(void *src, char type, JsonNode *root, struct path **keys);
-//JsonNode *jsonUpdatetd(JsonNode *src, JsonNode *root);
-//#define jsonUpdatetdl(src, root, args...) jsonUpdatetd(src, jsonReadnsl(root, ##args))
-//JsonNode *jsonUpdatetdv(JsonNode *src, JsonNode *root, struct path **keys);
-//int jsonUpdatetd(void *src, char type, JsonNode *root);
-//#define jsonUpdatetdl(src, type, root, args...)                                     \
-//  jsonUpdatetd(src, type, jsonReadnsl(root, ##args))
-//int jsonUpdatetdv(void *src, char type, JsonNode *root, struct path **keys);
+JsonNode *jsonUpdatets(void *src, char type, JsonNode *root);
+#define jsonUpdatensl(src, root, args...) jsonUpdatens(src, jsonReadnsl(root, ##args))
+JsonNode *jsonUpdatensv(JsonNode *src, JsonNode *root, struct path **keys);
+#define jsonUpdatetsl(src, type, root, args...)                                     \
+  jsonUpdatets(src, type, jsonReadnsl(root, ##args))
+JsonNode *jsonUpdatetsv(void *src, char type, JsonNode *root, struct path **keys);
 
 // delete
 JsonNode *jsonDelete(JsonNode *elem);
@@ -149,4 +150,9 @@ void array_tests();
 void object_tests();
 void copy_tests();
 void interface_tests();
+
+void jsonCreate_tests();
+void jsonRead_tests();
+void jsonUpdate_tests();
+
 int main();
