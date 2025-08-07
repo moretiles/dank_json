@@ -9,6 +9,7 @@
  */
 #define JSON_ELEM_IS_HEAD (1 << 7)
 #define JSON_ELEM_IS_TAIL (1 << 6)
+#define JSON_ELEM_CONTENTS_ON_HEAP (1 << 5)
 
 #define JSON_NUM_IS_NUM (1 << 0)
 #define JSON_NUM_IS_SCIENTIFIC (1 << 1)

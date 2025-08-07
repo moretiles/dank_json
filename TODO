@@ -1,14 +1,15 @@
 Progress map
 
+Core functionality
+* Handle memory leaks for jsonCreate family
 * Write tests for the jsonCreate, jsonRead, jsonUpdate families.
 * Give structs better names in the public interface.
 
-CORE FUNCTIONALITY WORKING
-
+Nice oh have:
 * Make sure JSON dictionaries are sorted in the same order as input.
-* Make sure we allocate dictionaries using a pool.
-* Try out a malloc bins style string allocation method.
-* Add error queue.
 * Use wchar_t for strings to properly handle 2 byte escapes (like \xabcd).
+* Use prev and next to connect together active nodes in a dictionary (saving deallocation time).
+
+Maybe:
+* Make sure we allocate dictionaries using a pool.
 * Use global zero initialized node to populate initial dictionary so we only "waste" memory on pointers, not nodes
-* Store linked list of active nodes in pool so that most of the time the program spends is not checking if nonexistant nodes need to be deallocated
