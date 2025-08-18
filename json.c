@@ -102,7 +102,8 @@ int jsonLibEnd() {
     return ret;
 }
 
-JsonNode *jsonCreate() {
+//JsonNode *jsonCreate() {
+JsonNode *_jsonCreate() {
     if (elems == NULL || scratch.chars == NULL) {
         return NULL;
     }
@@ -110,13 +111,14 @@ JsonNode *jsonCreate() {
     return new_node(elems);
 }
 
-JsonNode *jsonCreatetd(void *src, char type) {
+//JsonNode *jsonCreatetd(void *src, char type) {
+JsonNode *jsonCreate(void *src, char type) {
     char **keys = NULL;
     JsonNode **vals = NULL;
     JsonNode *new = NULL, *ret = NULL;
 
-    new = jsonCreate();
-    ret = jsonCreate();
+    new = _jsonCreate();
+    ret = _jsonCreate();
     if (new == NULL || ret == NULL ||
             (src == NULL && !(type == JSON_ARRAY || type == JSON_OBJECT))) {
         return NULL;
@@ -176,12 +178,13 @@ JsonNode *jsonCreatetd(void *src, char type) {
     return ret;
 }
 
+/*
 JsonNode *jsonCreatets(void *src, char type) {
     char **keys = NULL;
     JsonNode **vals = NULL;
     JsonNode *ret = NULL;
 
-    ret = jsonCreate();
+    ret = _jsonCreate();
     if (ret == NULL ||
             (src == NULL && !(type == JSON_ARRAY || type == JSON_OBJECT))) {
         return NULL;
@@ -234,15 +237,17 @@ JsonNode *jsonCreatets(void *src, char type) {
 
     return ret;
 }
+*/
 
 // Using a macro to protect against people forgetting NULL
-JsonNode *jsonReadnsl(JsonNode *root, ...) {
+//JsonNode *jsonReadnsl(JsonNode *root, ...) {
+JsonNode *_jsonReadl(JsonNode *root, ...) {
     va_list args;
-    struct path *path = NULL;
+    struct json_path_partial *path = NULL;
     JsonNode *current = root;
 
     va_start(args, root);
-    path = va_arg(args, struct path *);
+    path = va_arg(args, struct json_path_partial *);
     while (current != NULL && path != NULL) {
         switch (path->type) {
         case JSON_ARRAY:
@@ -260,15 +265,16 @@ JsonNode *jsonReadnsl(JsonNode *root, ...) {
             break;
         }
 
-        path = va_arg(args, struct path *);
+        path = va_arg(args, struct json_path_partial *);
     }
     va_end(args);
 
     return current;
 }
 
-JsonNode *jsonReadnsv(JsonNode *root, struct path **keys) {
-    struct path *path = NULL;
+//JsonNode *jsonReadnsv(JsonNode *root, struct json_path_partial **keys) {
+JsonNode *jsonReadv(JsonNode *root, struct json_path_partial **keys) {
+    struct json_path_partial *path = NULL;
     JsonNode *current = root;
     size_t n = 0;
 
@@ -298,6 +304,7 @@ JsonNode *jsonReadnsv(JsonNode *root, struct path **keys) {
     return current;
 }
 
+/*
 JsonNode *jsonReadnd(JsonNode *root) {
     if (root == NULL) {
         return NULL;
@@ -309,21 +316,37 @@ JsonNode *jsonReadnd(JsonNode *root) {
     copy_json_node(new, root);
     return new;
 }
+*/
 
-JsonNode *jsonReadndv(JsonNode *root, struct path **keys) {
+/*
+JsonNode *jsonReadndv(JsonNode *root, struct json_path_partial **keys) {
     return jsonReadnd(jsonReadnsv(root, keys));
 }
+*/
 
-JsonNode *jsonCreatetsv(void *src, char type, JsonNode *root, struct path **keys) {
+/*
+JsonNode *jsonCreatetsv(void *src, char type, JsonNode *root, struct json_path_partial **keys) {
     return jsonCreatensv(jsonCreatets(src, type), root, keys);
 }
+*/
 
-JsonNode *jsonCreatetdv(void *src, char type, JsonNode *root, struct path **keys) {
-    return jsonCreatensv(jsonCreatetd(src, type), root, keys);
+//JsonNode *jsonCreatetdv(void *src, char type, JsonNode *root, struct json_path_partial **keys) {
+JsonNode *jsonCreatev(void *src, char type, JsonNode *root, struct json_path_partial **keys) {
+    JsonNode tmp = { .contents.l = JSON_NULL, .type = JSON_LITERAL, .prev = NULL, .next = NULL };
+    JsonNode *new = jsonCopyv(&tmp, root, keys);
+    if(new == NULL) {
+        return NULL;
+    }
+    return jsonUpdate(src, type, new);
+    /*
+    return cmemcpy(node, jsonCreatendv(&((JsonNode) {
+        .contents.a = NULL, .type = JSON_OBJECT, .next = NULL
+    }), root, keys), sizeof(JsonNode));
+    return jsonCreatensv(jsonCreate(src, type), root, keys);
+    */
 }
 
-JsonNode *jsonCreatetdv(void *src, char type, JsonNode *root, struct path **keys);
-
+/*
 JsonNode *jsonReadts(void *dest, char type, JsonNode *root) {
     if (dest == NULL || root == NULL || root->type != type) {
         return NULL;
@@ -349,18 +372,28 @@ JsonNode *jsonReadts(void *dest, char type, JsonNode *root) {
 
     return root;
 };
+*/
 
-JsonNode *jsonReadtsv(void *dest, char type, JsonNode *root, struct path **keys) {
+/*
+JsonNode *jsonReadtsv(void *dest, char type, JsonNode *root, struct json_path_partial **keys) {
     return jsonReadts(dest, type, jsonReadnsv(root, keys));
 }
+*/
 
-JsonNode *jsonCreatendl(JsonNode *node, JsonNode *root, ...) {
+//JsonNode *jsonCreatendl(JsonNode *node, JsonNode *root, ...) {
+JsonNode *_jsonCopyl(JsonNode *node, JsonNode *root, ...) {
     va_list args;
-    struct path *path = NULL, *prev = NULL;
+    struct json_path_partial *prev = NULL, *path = NULL, *child = NULL;
     JsonNode *current = root, *parent = root, *new = NULL;
+    int created = 0;
 
     va_start(args, root);
-    path = va_arg(args, struct path *);
+    path = va_arg(args, struct json_path_partial *);
+    if (path == NULL) {
+        return NULL;
+    }
+    child = va_arg(args, struct json_path_partial *);
+
     if (node == NULL || root == NULL || path == NULL) {
         return NULL;
     }
@@ -373,6 +406,21 @@ JsonNode *jsonCreatendl(JsonNode *node, JsonNode *root, ...) {
                 return NULL;
             }
             current = array_get_nth(current, path->path.index);
+            while(current == NULL) {
+                if(child && child->type & (JSON_ARRAY | JSON_OBJECT)) {
+                    created = array_add_node(parent, jsonCreate(NULL, child->type));
+                } else {
+                    jsonLiteral null = JSON_NULL;
+                    created = array_add_node(parent, jsonCreate(&null, JSON_LITERAL));
+                    //created = array_add_node(parent, _jsonCreate());
+                }
+
+                if(created != 0) {
+                    // current is always NULL for this branch, thus prev becomes NULL therefore function return NULL
+                    break;
+                }
+                current = array_get_nth(parent, path->path.index);
+            }
             prev = path;
             break;
 
@@ -381,6 +429,21 @@ JsonNode *jsonCreatendl(JsonNode *node, JsonNode *root, ...) {
                 return NULL;
             }
             current = ht_find(current->contents.o, path->path.key);
+            if(current == NULL) {
+                if(child && child->type & (JSON_ARRAY | JSON_OBJECT)) {
+                    new = ht_insert(parent->contents.o, path->path.key, jsonCreate(NULL, child->type));
+                } else {
+                    jsonLiteral null = JSON_NULL;
+                    new = ht_insert(parent->contents.o, path->path.key, jsonCreate(&null, JSON_LITERAL));
+                    //new = ht_insert(parent->contents.o, path->path.key, _jsonCreate());
+                }
+
+                if(new == NULL) {
+                    // current is always NULL for this branch, thus prev becomes NULL therefore function return NULL
+                    break;
+                }
+                current = ht_find(parent->contents.o, path->path.key);
+            }
             prev = path;
             break;
 
@@ -390,10 +453,14 @@ JsonNode *jsonCreatendl(JsonNode *node, JsonNode *root, ...) {
         }
 
         if (current == NULL) {
+            prev = NULL;
             break;
         }
         parent = current;
-        path = va_arg(args, struct path *);
+        path = child;
+        if(path != NULL) {
+            child = va_arg(args, struct json_path_partial *);
+        }
     }
     va_end(args);
 
@@ -401,57 +468,36 @@ JsonNode *jsonCreatendl(JsonNode *node, JsonNode *root, ...) {
         return NULL;
     }
 
-    switch (prev->type) {
-    case JSON_ARRAY:
-        if (parent->type != JSON_ARRAY) {
-            return NULL;
-        }
-        new = new_node(elems);
-        if (new == NULL) {
-            return NULL;
-        }
-        copy_json_node(new, node);
-        array_add_node(parent, new);
-        break;
-
-    case JSON_OBJECT:
-        if (parent->type != JSON_OBJECT || parent->contents.o == NULL) {
-            return NULL;
-        }
-        new = new_node(elems);
-        if (new == NULL) {
-            return NULL;
-        }
-        copy_json_node(new, node);
-        ht_insert(parent->contents.o, prev->path.key, new);
-        break;
-    }
-
-    return new;
+    return copy_json_node_preserve_references(current, node);
 }
 
-//JsonNode *jsonCreatensv(JsonNode *node, JsonNode *root, struct path **keys){
+//JsonNode *jsonCreatensv(JsonNode *node, JsonNode *root, struct json_path_partial **keys){
 //	return cmemcpy(node, jsonReadnsv(root, keys), sizeof(JsonNode));
 //}
 
-JsonNode *jsonCreatensv(JsonNode *node, JsonNode *root, struct path **keys) {
-    return cmemcpy(node, jsonCreatendv(&((JsonNode) {
+/*
+JsonNode *jsonCreatensv(JsonNode *node, JsonNode *root, struct json_path_partial **keys) {
+    return cmemcpy(node, jsonCopyv(&((JsonNode) {
         .contents.a = NULL, .type = JSON_OBJECT, .next = NULL
     }), root, keys), sizeof(JsonNode));
 }
+*/
 
-JsonNode *jsonCreatendv(JsonNode *node, JsonNode *root, struct path **keys) {
-    struct path *path = NULL, *prev = NULL;
+//JsonNode *jsonCreatendv(JsonNode *node, JsonNode *root, struct json_path_partial **keys) {
+JsonNode *jsonCopyv(JsonNode *node, JsonNode *root, struct json_path_partial **keys) {
+    struct json_path_partial *prev = NULL, *path = NULL, *child = NULL;
     JsonNode *current = root, *parent = root, *new = NULL;
+    int created = 0;
     size_t i = 0;
 
     if (root == NULL || node == NULL || keys == NULL) {
         return NULL;
     }
-    path = keys[i++];
+    path = keys[i];
     if (path == NULL) {
         return NULL;
     }
+    child = keys[++i];
     prev = path;
 
     while (path != NULL) {
@@ -461,6 +507,21 @@ JsonNode *jsonCreatendv(JsonNode *node, JsonNode *root, struct path **keys) {
                 return NULL;
             }
             current = array_get_nth(current, path->path.index);
+            while(current == NULL) {
+                if(child && child->type & (JSON_ARRAY | JSON_OBJECT)) {
+                    created = array_add_node(parent, jsonCreate(NULL, child->type));
+                } else {
+                    jsonLiteral null = JSON_NULL;
+                    created = array_add_node(parent, jsonCreate(&null, JSON_LITERAL));
+                    //created = array_add_node(parent, _jsonCreate());
+                }
+
+                if(created != 0) {
+                    // current is always NULL for this branch, thus prev becomes NULL therefore function return NULL
+                    break;
+                }
+                current = array_get_nth(parent, path->path.index);
+            }
             prev = path;
             break;
 
@@ -469,6 +530,21 @@ JsonNode *jsonCreatendv(JsonNode *node, JsonNode *root, struct path **keys) {
                 return NULL;
             }
             current = ht_find(current->contents.o, path->path.key);
+            if(current == NULL) {
+                if(child && child->type & (JSON_ARRAY | JSON_OBJECT)) {
+                    new = ht_insert(parent->contents.o, path->path.key, jsonCreate(NULL, child->type));
+                } else {
+                    jsonLiteral null = JSON_NULL;
+                    new = ht_insert(parent->contents.o, path->path.key, jsonCreate(&null, JSON_LITERAL));
+                    //new = ht_insert(parent->contents.o, path->path.key, _jsonCreate());
+                }
+
+                if(new == NULL) {
+                    // current is always NULL for this branch, thus prev becomes NULL therefore function return NULL
+                    break;
+                }
+                current = ht_find(parent->contents.o, path->path.key);
+            }
             prev = path;
             break;
 
@@ -481,18 +557,20 @@ JsonNode *jsonCreatendv(JsonNode *node, JsonNode *root, struct path **keys) {
             break;
         }
         parent = current;
-        path = keys[i++];
+        path = child;
+        if(child != NULL) {
+            child = keys[++i];
+        }
     }
 
     if (prev == NULL) {
         return NULL;
     }
 
+    return copy_json_node_preserve_references(current, node);
+    /*
     switch (prev->type) {
     case JSON_ARRAY:
-        if (parent->type != JSON_ARRAY) {
-            return NULL;
-        }
         new = new_node(elems);
         if (new == NULL) {
             return NULL;
@@ -502,9 +580,6 @@ JsonNode *jsonCreatendv(JsonNode *node, JsonNode *root, struct path **keys) {
         break;
 
     case JSON_OBJECT:
-        if (parent->type != JSON_OBJECT || parent->contents.o == NULL) {
-            return NULL;
-        }
         new = new_node(elems);
         if (new == NULL) {
             return NULL;
@@ -513,6 +588,7 @@ JsonNode *jsonCreatendv(JsonNode *node, JsonNode *root, struct path **keys) {
         ht_insert(parent->contents.o, prev->path.key, new);
         break;
     }
+    */
     /*
     switch (prev->type) {
     case JSON_ARRAY:
@@ -538,20 +614,38 @@ JsonNode *jsonCreatendv(JsonNode *node, JsonNode *root, struct path **keys) {
       ht_insert(parent->contents.o, prev->path.key, new);
       break;
     }
-    */
 
     return new;
+    */
 }
 
+/*
 JsonNode *jsonUpdatend(JsonNode *src, JsonNode *root) {
     return copy_json_node(root, src);
 }
+*/
 
-JsonNode *jsonUpdatendv(JsonNode *src, JsonNode *root, struct path **keys) {
-    return jsonUpdatend(src, jsonReadnsv(root, keys));
+JsonNode *jsonCopy(JsonNode *root) {
+    JsonNode *src = _jsonCreate();
+
+    if(src == NULL) {
+        return NULL;
+    }
+    if(root == NULL) {
+        root = _jsonCreate();
+    }
+
+    return copy_json_node(root, src);
 }
 
-JsonNode *jsonUpdatetd(void *src, char type, JsonNode *root) {
+/*
+JsonNode *jsonUpdatendv(JsonNode *src, JsonNode *root, struct json_path_partial **keys) {
+    return jsonUpdatend(src, jsonReadnsv(root, keys));
+}
+*/
+
+//JsonNode *jsonUpdatetd(void *src, char type, JsonNode *root) {
+JsonNode *jsonUpdate(void *src, char type, JsonNode *root) {
     if (src == NULL || root == NULL) {
         return NULL;
     }
@@ -593,10 +687,12 @@ JsonNode *jsonUpdatetd(void *src, char type, JsonNode *root) {
     return root;
 }
 
-JsonNode *jsonUpdatetdv(void *src, char type, JsonNode *root, struct path **keys) {
-    return jsonUpdatetd(src, type, jsonReadnsv(root, keys));
+//JsonNode *jsonUpdatetdv(void *src, char type, JsonNode *root, struct json_path_partial **keys) {
+JsonNode *jsonUpdatev(void *src, char type, JsonNode *root, struct json_path_partial **keys) {
+    return jsonUpdate(src, type, jsonReadv(root, keys));
 }
 
+/*
 JsonNode *jsonUpdatets(void *src, char type, JsonNode *root) {
     JsonNode *ret = NULL, *new = NULL;
     new = jsonCreatets(src, type);
@@ -606,19 +702,27 @@ JsonNode *jsonUpdatets(void *src, char type, JsonNode *root) {
     }
     return ret;
 }
+*/
 
+/*
 JsonNode *jsonUpdatens(JsonNode *src, JsonNode *root) {
     return cmemcpy(root, src, sizeof(JsonNode));
 }
+*/
 
-JsonNode *jsonUpdatensv(JsonNode *src, JsonNode *root, struct path **keys) {
+/*
+JsonNode *jsonUpdatensv(JsonNode *src, JsonNode *root, struct json_path_partial **keys) {
     return jsonUpdatens(src, jsonReadnsv(root, keys));
 }
+*/
 
-JsonNode *jsonUpdatetsv(void *src, char type, JsonNode *root, struct path **keys) {
+/*
+JsonNode *jsonUpdatetsv(void *src, char type, JsonNode *root, struct json_path_partial **keys) {
     return jsonUpdatets(src, type, jsonReadnsv(root, keys));
 }
+*/
 
+/*
 JsonNode *jsonReadtd(void *dest, char type, JsonNode *root) {
     if (dest == NULL || root == NULL || root->type != type) {
         return NULL;
@@ -644,10 +748,13 @@ JsonNode *jsonReadtd(void *dest, char type, JsonNode *root) {
 
     return root;
 }
+*/
 
-JsonNode *jsonReadtdv(void *dest, char type, JsonNode *root, struct path **keys) {
+/*
+JsonNode *jsonReadtdv(void *dest, char type, JsonNode *root, struct json_path_partial **keys) {
     return jsonReadtd(dest, type, jsonReadnsv(root, keys));
 }
+*/
 
 int jsonOut(FILE *dest, char minify, JsonNode *root) {
     char *ptr = calloc(2 * MAX_STR_SIZE + 1, sizeof(char));
@@ -663,7 +770,7 @@ int jsonOut(FILE *dest, char minify, JsonNode *root) {
         return -1;
     }
 
-    jsonOutRecurse(&out, minify, 0, root);
+    json_out_recurse(&out, minify, 0, root);
 
     enqueuec(&out, '\n');
     enqueuec(&out, '\x00');
@@ -681,12 +788,12 @@ JsonNode *jsonDelete(JsonNode *elem) {
     return destroy_node(elems, elem);
 }
 
-JsonNode *jsonDeletev(JsonNode *root, struct path **keys) {
-    return jsonDelete(jsonReadnsv(root, keys));
+JsonNode *jsonDeletev(JsonNode *root, struct json_path_partial **keys) {
+    return jsonDelete(jsonReadv(root, keys));
 }
 
-int jsonOutRecurse(struct queue *file, char minify, int offset,
-                   JsonNode *root) {
+int json_out_recurse(struct queue *file, char minify, int offset,
+                     JsonNode *root) {
     // char mask = 0xff - (META_INVALID | META_FREE | JSON_ELEMENT);
     JsonNode *current = NULL;
     size_t i = 0;
@@ -736,22 +843,20 @@ int jsonOutRecurse(struct queue *file, char minify, int offset,
     case JSON_ARRAY:
         offset += 2;
 
-        if (root->contents.a == NULL) {
-            return -4;
-        }
-
         enqueuec(file, '[');
         if (minify == 0) {
             enqueuec(file, '\n');
         }
 
-        current = array_get_nth(root, i++);
+        if (root->contents.a != NULL) {
+            current = array_get_nth(root, i++);
+        }
         while (current != NULL) {
             if (minify == 0) {
                 enqueuecn(file, ' ', offset);
             }
 
-            jsonOutRecurse(file, minify, offset, current);
+            json_out_recurse(file, minify, offset, current);
 
             current = array_get_nth(root, i++);
             if (current != NULL) {
@@ -782,7 +887,7 @@ int jsonOutRecurse(struct queue *file, char minify, int offset,
 
         offset += 2;
 
-        while (i < root->contents.o->cap) {
+        while (i < root->contents.o->cap && root->contents.o->count != 0) {
             if (root->contents.o->keys[i] != NULL) {
                 if (minify == 0) {
                     enqueuecn(file, ' ', offset);
@@ -800,7 +905,7 @@ int jsonOutRecurse(struct queue *file, char minify, int offset,
 
             current = root->contents.o->vals[i++];
             if (current != NULL) {
-                jsonOutRecurse(file, minify, offset, current);
+                json_out_recurse(file, minify, offset, current);
 
                 enqueuec(file, ',');
                 if (minify == 0) {
@@ -809,11 +914,13 @@ int jsonOutRecurse(struct queue *file, char minify, int offset,
             }
         }
 
-        if (minify == 0) {
-            file->pos -= (2);
-            enqueuec(file, '\n');
-        } else {
-            file->pos -= (1);
+        if(root->contents.o->count != 0) {
+            if (minify == 0) {
+                file->pos -= (2);
+                enqueuec(file, '\n');
+            } else {
+                file->pos -= (1);
+            }
         }
         offset -= 2;
         if (minify == 0) {
@@ -829,8 +936,8 @@ int jsonOutRecurse(struct queue *file, char minify, int offset,
     return 0;
 }
 
-int jsonOutv(FILE *dest, char minify, JsonNode *root, struct path **keys) {
-    return jsonOut(dest, minify, jsonReadnsv(root, keys));
+int jsonOutv(FILE *dest, char minify, JsonNode *root, struct json_path_partial **keys) {
+    return jsonOut(dest, minify, jsonReadv(root, keys));
 }
 
 /*
@@ -841,7 +948,7 @@ JsonNode *new_node(struct json_pool *pool) {
         return NULL;
     }
 
-    if (pool->next_free != NULL && pool->stored == pool->cap) {
+    if (pool->next_free == NULL && pool->stored == pool->cap) {
         double_pool(&elems);
     }
 
@@ -903,7 +1010,7 @@ void get_next(char *outer, struct queue *store) {
         // printf("whitespace found %c\n", c);
         dequeuec(store, &c);
     }
-    if (c == '"' || c == '[' || c == '{') {
+    if (c == '"' || c == '[' || c == '{' || c == ']' || c == '}') {
         outer[0] = c;
         outer[1] = '\x00';
         return;
@@ -930,7 +1037,7 @@ void get_next(char *outer, struct queue *store) {
  */
 char get_sep(struct queue *store) {
     char c = ' ';
-    while (is_whitespace(c)) {
+    while (store->base < store->pos && is_whitespace(c)) {
         dequeuec(store, &c);
     }
 
@@ -991,6 +1098,11 @@ static inline int is_json_array(char *str) {
 static inline int is_json_object(char *str) {
     return strlen(str) >= 1 && str[0] == '{';
 }
+
+static inline int is_json_end(char *str) {
+    return strlen(str) >= 1 && (str[0] == ']' || str[0] == '}');
+}
+
 
 static inline char get_json_literal(const char *ptr) {
     if (ptr == NULL) {
@@ -1117,6 +1229,10 @@ JsonNode *get_json_object(struct queue *file, struct queue *scratch,
 
         key = new_node(elems);
         process(file, key);
+        if(key->type == JSON_CLOSE) {
+            jsonDelete(key);
+            break;
+        }
         sep = get_sep(file);
         if (sep != ':') {
             return NULL;
@@ -1162,6 +1278,8 @@ JsonNode *process(struct queue *file, JsonNode *elem) {
         elem->type = JSON_ARRAY;
     } else if ((tmp_flags = is_json_object(fragment))) {
         elem->type = JSON_OBJECT;
+    } else if ((tmp_flags = is_json_end(fragment))) {
+        elem->type = JSON_CLOSE;
     } else {
         elem->type = META_INVALID;
     }
@@ -1208,14 +1326,24 @@ JsonNode *process(struct queue *file, JsonNode *elem) {
 JsonNode *copy_json_node(JsonNode *dest, JsonNode *src) {
     size_t i = 0;
     char *new_str = NULL;
+    //JsonNode *orig_prev = NULL, *orig_next = NULL;
     JsonNode *orig_child = NULL, *new_child = NULL;
     char **keys = NULL;
     JsonNode **vals = NULL;
     struct ht *table = NULL;
+    //jsonType orig_type;
+    //jsonFlags orig_flags;
 
     if (dest == NULL || src == NULL) {
         return NULL;
     }
+
+    /*
+    orig_prev = dest->prev;
+    orig_next = dest->next;
+    orig_type = dest->type;
+    orig_flags = dest->flags;
+    */
 
     switch (src->type) {
     case JSON_LITERAL:
@@ -1311,9 +1439,129 @@ JsonNode *copy_json_node(JsonNode *dest, JsonNode *src) {
         return NULL;
         break;
     }
-    dest->prev = NULL;
-    dest->next = NULL;
+
+    /*
+    switch(orig_type) {
+    case META_INVALID:
+    case META_FREE:
+        dest->prev = NULL;
+        dest->next = NULL;
+        break;
+    default:
+        dest->prev = orig_prev;
+        dest->next = orig_next;
+        dest->flags |= (orig_flags & JSON_ELEM_IS_HEAD);
+        dest->flags |= (orig_flags & JSON_ELEM_IS_TAIL);
+        break;
+    }
+    */
+
     return dest;
+}
+
+JsonNode *copy_json_node_preserve_references(JsonNode *dest, JsonNode *src) {
+    JsonNode *orig_prev = NULL, *orig_next = NULL;
+    jsonType orig_type;
+    jsonFlags orig_flags;
+
+    if (dest == NULL || src == NULL) {
+        return NULL;
+    }
+
+    orig_prev = dest->prev;
+    orig_next = dest->next;
+    orig_type = dest->type;
+    orig_flags = dest->flags;
+
+    copy_json_node(dest, src);
+
+    switch(orig_type) {
+    case META_INVALID:
+    case META_FREE:
+        dest->prev = NULL;
+        dest->next = NULL;
+        break;
+    default:
+        dest->prev = orig_prev;
+        dest->next = orig_next;
+        dest->flags |= (orig_flags & JSON_ELEM_IS_HEAD);
+        dest->flags |= (orig_flags & JSON_ELEM_IS_TAIL);
+        break;
+    }
+
+    return dest;
+}
+
+jsonType *jsonCheckType(JsonNode *root) {
+    if(root == NULL) {
+        return NULL;
+    } else {
+        return &(root->type);
+    }
+}
+
+jsonType *jsonCheckTypev(JsonNode *root, struct json_path_partial **keys) {
+    return jsonCheckType(jsonReadv(root, keys));
+}
+
+jsonLiteral *jsonReadLiteral(JsonNode *root) {
+    if(root == NULL || (root->type & JSON_LITERAL) == 0) {
+        return NULL;
+    }
+
+    return &(root->contents.l);
+}
+
+jsonLiteral *jsonReadLiteralv(JsonNode *root, struct json_path_partial **keys) {
+    return jsonReadLiteral(jsonReadv(root, keys));
+}
+
+double *jsonReadDouble(JsonNode *root) {
+    if(root == NULL || (root->type & JSON_NUM) == 0) {
+        return NULL;
+    }
+
+    return &(root->contents.d);
+}
+
+double *jsonReadDoublev(JsonNode *root, struct json_path_partial **keys) {
+    return jsonReadDouble(jsonReadv(root, keys));
+}
+
+char *jsonReadStr(JsonNode *root) {
+    if(root == NULL || (root->type & JSON_STR) == 0) {
+        return NULL;
+    }
+
+    return root->contents.s;
+}
+
+char *jsonReadStrv(JsonNode *root, struct json_path_partial **keys) {
+    return jsonReadStr(jsonReadv(root, keys));
+}
+
+JsonNode *jsonReadArray(JsonNode *root) {
+    if(root == NULL || (root->type & JSON_ARRAY) == 0) {
+        return NULL;
+    }
+
+    return root;
+}
+
+JsonNode *jsonReadArrayv(JsonNode *root, struct json_path_partial **keys) {
+    return jsonReadArray(jsonReadv(root, keys));
+}
+
+JsonNode *jsonReadObject(JsonNode *root) {
+    if(root == NULL || (root->type & JSON_OBJECT) == 0) {
+        return NULL;
+    }
+
+    return root;
+}
+
+JsonNode *jsonReadObjectv(JsonNode *root, struct json_path_partial **keys) {
+    return jsonReadObject(jsonReadv(root, keys));
 }
 
 #if TEST_BUILD == 1
@@ -1581,53 +1829,123 @@ void copy_tests() {
     jsonLibEnd();
 }
 
-void interface_tests() {
+void jsonRead_tests() {
     jsonLibInit();
 
     // JsonNode *array = jsonOpen("./tests/array1.json");
     JsonNode *object = jsonOpen("./tests/object1.json");
 
-    JsonNode *exists = jsonReadnsl(object, _KEY("D"), _INDEX(2), NULL);
-    assert(exists != NULL);
-    assert(!strcmp(exists->contents.s, "yes"));
-    struct path *exists_path[] = {_KEY("D"), _INDEX(2), NULL};
-    JsonNode *exists2 = jsonReadnsv(object, exists_path);
-    assert(!strcmp(exists2->contents.s, "yes"));
+    // Check string
+    {
+        char *my_str = NULL;
+        struct json_path_partial *exists_path[] = {_KEY("D"), _INDEX(2), NULL};
+        JsonNode *exists = jsonReadl(object, _KEY("D"), _INDEX(2), NULL);
+        assert(exists != NULL);
+        JsonNode *exists2 = jsonReadv(object, exists_path);
 
-    // jsonOut(stdout, 0, object);
-    char my_str[99] = "";
-    assert(jsonReadtd(&my_str, JSON_STR, exists) != NULL);
-    assert(strlen(my_str) == 3);
-    assert(jsonReadtd(&my_str, JSON_STR, exists2) != NULL);
-    assert(strlen(my_str) == 3);
-    assert(jsonReadtdl(&my_str, JSON_STR, object, _KEY("D"), _INDEX(2), NULL) != NULL);
-    assert(strlen(my_str) == 3);
-    assert(jsonReadtdv(&my_str, JSON_STR, object, exists_path) != NULL);
-    assert(strlen(my_str) == 3);
-    JsonNode read_from = {0};
-    memset(&read_from, 0, sizeof(JsonNode));
-    read_from.contents.d = 777.777;
-    read_from.type = JSON_NUM;
-    double cool = -7777777777777777777777777777777777777.7;
-    jsonReadtd(&cool, JSON_NUM, &read_from);
-    assert(cool == 777.777);
-    read_from.contents.l = JSON_TRUE;
-    read_from.type = JSON_LITERAL;
-    char cooler = JSON_FALSE;
-    jsonReadtd(&cooler, JSON_LITERAL, &read_from);
-    assert(cooler == JSON_TRUE);
+        my_str = jsonReadStr(exists); // Fails if NULL assigned to my_str
+        assert(my_str != NULL);
+        assert(!strcmp(my_str, "yes"));
+        my_str = jsonReadStr(exists2);
+        assert(my_str != NULL);
+        assert(!strcmp(my_str, "yes"));
 
+        my_str = jsonReadStrl(object, _KEY("D"), _INDEX(2), NULL);
+        assert(my_str != NULL);
+        assert(!strcmp(my_str, "yes"));
+        my_str = jsonReadStrv(object, exists_path);
+        assert(my_str != NULL);
+        assert(!strcmp(my_str, "yes"));
+    }
+
+    // Check literal
+    {
+        jsonType *read_literal = NULL;
+
+        read_literal = jsonReadLiterall(object, _KEY("E"));
+        assert(read_literal != NULL);
+        assert(*read_literal == JSON_FALSE);
+
+        struct json_path_partial *read_literal_path[] = { _KEY("E"), NULL };
+        read_literal = jsonReadLiteralv(object, read_literal_path);
+        assert(read_literal != NULL);
+        assert(*read_literal == JSON_FALSE);
+    }
+
+    // Check double
+    {
+        double *read_double = NULL;
+
+        read_double = jsonReadDoublel(object, _KEY("D"), _INDEX(0), _KEY("A"));
+        assert(read_double != NULL);
+        assert(*read_double == 10.0);
+
+        struct json_path_partial *read_double_path[] = { _KEY("D"), _INDEX(0), _KEY("A"), NULL };
+        read_double = jsonReadDoublev(object, read_double_path);
+        assert(read_double != NULL);
+        assert(*read_double == 10.0);
+    }
+
+    // Check array
+    {
+        JsonNode *read_array = NULL;
+
+        read_array = jsonReadArrayl(object, _KEY("D"));
+        assert(read_array != NULL);
+        double *read_double = jsonReadDoublel(read_array, _INDEX(1));
+        assert(read_double != NULL);
+        assert(*read_double == 1.0);
+
+        struct json_path_partial *read_array_path[] = { _KEY("D"), NULL };
+        read_array = jsonReadArrayv(object, read_array_path);
+        assert(read_array != NULL);
+        read_double = jsonReadDoublel(read_array, _INDEX(1));
+        assert(read_double != NULL);
+        assert(*read_double == 1.0);
+    }
+
+    // Check object
+    {
+        JsonNode *read_object = NULL;
+        double *read_double = NULL;
+
+        read_object = jsonReadObjectl(object, _KEY("D"), _INDEX(0));
+        assert(read_object != NULL);
+        read_double = jsonReadDoublel(read_object, _KEY("B"));
+        assert(read_double != NULL);
+        assert(*read_double == 11.0);
+
+        struct json_path_partial *read_object_path[] = { _KEY("D"), _INDEX(0), NULL };
+        read_object = jsonReadObjectv(object, read_object_path);
+        assert(read_object != NULL);
+        read_double = jsonReadDoublel(read_object, _KEY("B"));
+        assert(read_double != NULL);
+        assert(*read_double == 11.0);
+    }
+
+    FILE *debug_out = fopen("./tmp/jsonRead.debug.json", "w");
+    assert(debug_out != NULL);
+    jsonOut(debug_out, 0, object);
+    assert(fclose(debug_out) == 0);
+    jsonLibEnd();
+    /*
+        JsonNode *read_object = NULL;
+        struct json_path_partial *read_double_path[] = { _KEY("D"), _INDEX(0), _KEY("A"), NULL };
+        assert(read_double != NULL);
+        assert(*read_double == 10.0);
+        */
+    /*
     double inlined = 3.333;
-    JsonNode *set_tree = jsonCreatetd(NULL, JSON_OBJECT);
-    JsonNode *breakage = jsonCreatetd(&inlined, JSON_NUM);
+    JsonNode *set_tree = jsonCreate(NULL, JSON_OBJECT);
+    JsonNode *breakage = jsonCreate(&inlined, JSON_NUM);
     assert(breakage != NULL);
     assert(jsonCreatendl(breakage, set_tree, _KEY("A"), NULL) != NULL);
     // assert(jsonUpdatetdl(&inlined, JSON_NUM, set_tree, _KEY("A"), NULL) == 0);
-    //printf("%f\n", jsonReadnsl(set_tree, _KEY("A"), NULL)->contents.d);
-    assert(jsonReadnsl(set_tree, _KEY("A"), NULL)->contents.d == inlined);
+    //printf("%f\n", jsonReadl(set_tree, _KEY("A"), NULL)->contents.d);
+    assert(jsonReadl(set_tree, _KEY("A"), NULL)->contents.d == inlined);
 
     char *inlined2 = "very good text much wow!";
-    struct path *pathDown[] = {
+    struct json_path_partial *pathDown[] = {
         _KEY("WE REALLY NEED TO TEST A LONG KEY "
              "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
              "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHHHHHHHHHHHHHHHHHH"
@@ -1635,11 +1953,11 @@ void interface_tests() {
              "!!!!!!!!!!!!!"),
         NULL
     };
-    JsonNode *epic_breakage = jsonCreatetd(inlined2, JSON_STR);
-    epic_breakage = jsonCreatendv(epic_breakage, set_tree, pathDown);
+    JsonNode *epic_breakage = jsonCreate(inlined2, JSON_STR);
+    epic_breakage = jsonCopyv(epic_breakage, set_tree, pathDown);
     assert(epic_breakage != NULL);
-    //printf("%s\n", jsonReadnsv(set_tree, pathDown)->contents.s);
-    assert(!strcmp(inlined2, jsonReadnsv(set_tree, pathDown)->contents.s));
+    //printf("%s\n", jsonReadv(set_tree, pathDown)->contents.s);
+    assert(!strcmp(inlined2, jsonReadv(set_tree, pathDown)->contents.s));
 
     JsonNode *new_node = jsonReadnd(exists);
     assert(new_node != exists);
@@ -1658,50 +1976,51 @@ void interface_tests() {
     created_node = jsonCreatendl(new_node, obj_copy, _KEY("E"), NULL);
     assert(created_node != NULL);
     // printf("%s\n", created_node->contents.s);
-    // printf("%s\n", jsonReadnsl(obj_copy, _KEY("E"), NULL)->contents.s);
+    // printf("%s\n", jsonReadl(obj_copy, _KEY("E"), NULL)->contents.s);
     assert(!strcmp(created_node->contents.s,
-                   jsonReadnsl(obj_copy, _KEY("E"), NULL)->contents.s));
+                   jsonReadl(obj_copy, _KEY("E"), NULL)->contents.s));
     created_node = NULL;
     created_node = jsonCreatendl(new_node, obj_copy, _KEY("D"), _INDEX(3), NULL);
     assert(created_node != NULL);
     assert(!strcmp(created_node->contents.s,
-                   jsonReadnsl(obj_copy, _KEY("D"), _INDEX(3), NULL)->contents.s));
-    JsonNode *pre = jsonReadnsl(obj_copy, _KEY("D"), _INDEX(3), NULL);
+                   jsonReadl(obj_copy, _KEY("D"), _INDEX(3), NULL)->contents.s));
+    JsonNode *pre = jsonReadl(obj_copy, _KEY("D"), _INDEX(3), NULL);
     assert(jsonDeletel(obj_copy, _KEY("D"), _INDEX(3), NULL) == pre);
     assert(jsonDelete(obj_copy) == obj_copy);
 
     obj_copy = jsonReadnd(object);
-    struct path *invalid[] = {NULL};
-    created_node = jsonCreatendv(new_node, obj_copy, invalid);
+    struct json_path_partial *invalid[] = {NULL};
+    created_node = jsonCopyv(new_node, obj_copy, invalid);
     assert(created_node == NULL);
     created_node = NULL;
-    struct path *depth1[] = {_KEY("E"), NULL};
-    created_node = jsonCreatendv(new_node, obj_copy, depth1);
+    struct json_path_partial *depth1[] = {_KEY("E"), NULL};
+    created_node = jsonCopyv(new_node, obj_copy, depth1);
     assert(created_node != NULL);
     // printf("%s\n", created_node->contents.s);
-    // printf("%s\n", jsonReadnsl(obj_copy, _KEY("E"), NULL)->contents.s);
+    // printf("%s\n", jsonReadl(obj_copy, _KEY("E"), NULL)->contents.s);
     assert(!strcmp(created_node->contents.s,
-                   jsonReadnsl(obj_copy, _KEY("E"), NULL)->contents.s));
+                   jsonReadl(obj_copy, _KEY("E"), NULL)->contents.s));
     created_node = NULL;
-    struct path *depth2[] = {_KEY("D"), _INDEX(3), NULL};
-    created_node = jsonCreatendv(new_node, obj_copy, depth2);
+    struct json_path_partial *depth2[] = {_KEY("D"), _INDEX(3), NULL};
+    created_node = jsonCopyv(new_node, obj_copy, depth2);
     assert(created_node != NULL);
     assert(!strcmp(created_node->contents.s,
-                   jsonReadnsl(obj_copy, _KEY("D"), _INDEX(3), NULL)->contents.s));
-    pre = jsonReadnsv(obj_copy, depth2);
+                   jsonReadl(obj_copy, _KEY("D"), _INDEX(3), NULL)->contents.s));
+    pre = jsonReadv(obj_copy, depth2);
     assert(jsonDeletev(obj_copy, depth2) == pre);
     assert(jsonDelete(obj_copy) == obj_copy);
 
     // jsonOut(stdout, 0, object);
-    jsonUpdatendl(jsonReadnsl(object, _KEY("B"), NULL), object, _KEY("A"), NULL);
-    assert(jsonReadnsl(object, _KEY("A"), NULL)->contents.d == 11);
-    struct path *inner_C[] = {_KEY("D"), _INDEX(0), _KEY("C"), NULL};
-    struct path *outer_C[] = {_KEY("C"), NULL};
-    jsonUpdatendv(jsonReadnsv(object, outer_C), object, inner_C);
-    assert(!strcmp(jsonReadnsv(object, inner_C)->contents.s, "some text I guess"));
+    jsonUpdatendl(jsonReadl(object, _KEY("B"), NULL), object, _KEY("A"), NULL);
+    assert(jsonReadl(object, _KEY("A"), NULL)->contents.d == 11);
+    struct json_path_partial *inner_C[] = {_KEY("D"), _INDEX(0), _KEY("C"), NULL};
+    struct json_path_partial *outer_C[] = {_KEY("C"), NULL};
+    jsonUpdatendv(jsonReadv(object, outer_C), object, inner_C);
+    assert(!strcmp(jsonReadv(object, inner_C)->contents.s, "some text I guess"));
     // jsonOut(stdout, 0, object);
 
     jsonLibEnd();
+    */
 }
 
 void output_tests() {
@@ -1723,8 +2042,7 @@ void output_tests() {
     out = fopen("/tmp/json-tests", "r");
     assert(out != NULL);
     */
-    char *expected = "{\"D\":[{\"C\":12,\"B\":11,\"A\":10},1,\"yes\"],\"C\":"
-                     "\"some text I guess\",\"B\":11,\"A\":10}\n";
+    char *expected = "{\"E\":false,\"D\":[{\"C\":12,\"B\":11,\"A\":10},1,\"yes\"],\"C\":\"some text I guess\",\"B\":11,\"A\":10}\n";
     char test[999];
     // Clang is unhappy about errno even though we check if it is invalid, false
     // positive
@@ -1735,7 +2053,7 @@ void output_tests() {
     assert(!strcmp(expected, test));
     assert(jsonOutl(stdin, 1, root, _KEY("D"), _INDEX(0), _KEY("B"), NULL) ==
            0);
-    struct path *keys[] = {_KEY("D"), _INDEX(0), _KEY("B"), NULL};
+    struct json_path_partial *keys[] = {_KEY("D"), _INDEX(0), _KEY("B"), NULL};
     assert(jsonOutv(stdin, 1, root, keys) == 0);
     fflush(out);
     fclose(out);
@@ -1748,22 +2066,63 @@ void jsonCreate_tests() {
     jsonLibInit();
     JsonNode *root = jsonOpen("./tests/test2.json");
     assert(root != NULL);
+    jsonLiteral new_literal = JSON_FALSE;
+    JsonNode *new = NULL;
 
+    new = jsonCreate(&new_literal, JSON_LITERAL);
+    assert(new != NULL);
+    assert(*(jsonReadLiteral(new)) == JSON_FALSE);
+
+    new = jsonCreatel(&new_literal, JSON_LITERAL, root, _INDEX(49));
+    assert(new != NULL);
+    assert(*(jsonReadLiteral(new)) == JSON_FALSE);
+    new = jsonReadl(root, _INDEX(49), NULL);
+    assert(new != NULL);
+    assert(*(jsonReadLiteral(new)) == JSON_FALSE);
+
+    struct json_path_partial *path_object_array[] = { _INDEX(99), NULL };
+    new = jsonCreatev(&new_literal, JSON_LITERAL, root, path_object_array);
+    assert(new != NULL);
+    assert(*(jsonReadLiteral(new)) == JSON_FALSE);
+    new = jsonReadv(root, path_object_array);
+    assert(new != NULL);
+    assert(*(jsonReadLiteral(new)) == JSON_FALSE);
+
+    new = jsonCreatel(&new_literal, JSON_LITERAL, root, _INDEX(0), _KEY("addedl"));
+    assert(new != NULL);
+    assert(*(jsonReadLiteral(new)) == JSON_FALSE);
+    new = jsonReadl(root, _INDEX(0), _KEY("addedl"));
+    assert(new != NULL);
+    assert(*(jsonReadLiteral(new)) == JSON_FALSE);
+
+    struct json_path_partial *path_object_object[] = { _INDEX(0), _KEY("addedv"), NULL };
+    new = jsonCreatev(&new_literal, JSON_LITERAL, root, path_object_object);
+    assert(new != NULL);
+    assert(*(jsonReadLiteral(new)) == JSON_FALSE);
+    new = jsonReadv(root, path_object_object);
+    assert(new != NULL);
+    assert(*(jsonReadLiteral(new)) == JSON_FALSE);
+
+    FILE *debug_out = fopen("./tmp/jsonCreate.debug.json", "w");
+    assert(debug_out != NULL);
+    jsonOut(debug_out, 0, root);
+    assert(fclose(debug_out) == 0);
     jsonLibEnd();
 }
 
+/*
 void jsonRead_tests() {
     jsonLibInit();
     JsonNode *root = jsonOpen("./tests/test2.json");
     assert(root != NULL);
 
     {
-        struct path *keys[] = { _INDEX(1), NULL };
+        struct json_path_partial *keys[] = { _INDEX(1), NULL };
 
         JsonNode *newnd = jsonReadnd(array_get_nth(root, 1));
-        JsonNode *newnsl = jsonReadnsl(root, _INDEX(1), NULL);
+        JsonNode *newnsl = jsonReadl(root, _INDEX(1), NULL);
         JsonNode *newndl = jsonReadndl(root, _INDEX(1), NULL);
-        JsonNode *newnsv = jsonReadnsv(root, keys);
+        JsonNode *newnsv = jsonReadv(root, keys);
         JsonNode *newndv = jsonReadndv(root, keys);
         assert(newnd != NULL);
         assert(newnd != array_get_nth(root, 1));
@@ -1805,90 +2164,320 @@ void jsonRead_tests() {
 
     jsonLibEnd();
 }
+*/
 
 void jsonUpdate_tests() {
     jsonLibInit();
     JsonNode *root = jsonOpen("./tests/test2.json");
     assert(root != NULL);
+    JsonNode *new = NULL;
 
+    // Test literals
     {
-        //JsonNode *newtd = jsonCreate(), *newnd = jsonCreate(), *newts = jsonCreate(), *newns = jsonCreate();
-        JsonNode *newtd = jsonCreate(), *newnd = jsonCreate();
-        assert(newtd != NULL && newnd != NULL);
-        char *teststring = "this is a test string";
+        jsonType newType = JSON_LITERAL;
+        jsonLiteral trueLiteral = JSON_TRUE;
+        jsonLiteral falseLiteral = JSON_FALSE;
 
-        jsonUpdatetd(teststring, JSON_STR, newtd);
-        assert(newtd->contents.s != NULL);
-        assert(newtd->contents.s != teststring);
-        assert(!strcmp(teststring, newtd->contents.s));
+        assert(jsonUpdatel(&trueLiteral, newType, root, _INDEX(4)));
+        new = jsonReadl(root, _INDEX(4));
+        assert(new != NULL);
+        assert(*(jsonReadLiterall(root, _INDEX(4))) == trueLiteral);
 
-        jsonUpdatend(newtd, newnd);
-        assert(newnd->contents.s != NULL);
-        assert(newnd->contents.s != newtd->contents.s);
-        assert(!strcmp(teststring, newnd->contents.s));
-
-        /*
-                jsonUpdatets(teststring, JSON_STR, newts);
-                assert(newts->contents.s != NULL);
-                assert(newts->contents.s == teststring);
-                assert(!strcmp(teststring, newts->contents.s));
-                */
+        struct json_path_partial *path_literal[] = { _INDEX(2), NULL };
+        assert(jsonUpdatev(&falseLiteral, newType, root, path_literal) != NULL);
+        new = jsonReadv(root, path_literal);
+        assert(new != NULL);
+        assert(*(jsonReadLiteralv(root, path_literal)) == falseLiteral);
     }
 
+    // Test doubles
     {
-        /*
-        JsonNode *updatetdl = jsonCreate(), *updatetdv = jsonCreate();
-        JsonNode *updatendl = jsonCreate(), *updatendv = jsonCreate();
-        */
-        JsonNode *newroot = jsonReadndl(root, _INDEX(0), NULL);
+        jsonType newType = JSON_NUM;
+        double jsonNum1 = 15.0;
+        double jsonNum2 = 35.0;
 
-        char *tdlTestString = "tdl test string";
-        jsonUpdatetdl(tdlTestString, JSON_STR, newroot, _KEY("6"), NULL);
-        JsonNode *nodetdl = jsonReadnsl(newroot, _KEY("6"), NULL);
-        assert(nodetdl != NULL);
-        assert(nodetdl->contents.s != NULL);
-        assert(strcmp(tdlTestString, nodetdl->contents.s) == 0);
+        assert(jsonUpdatel(&jsonNum1, newType, root, _INDEX(4)));
+        new = jsonReadl(root, _INDEX(4));
+        assert(new != NULL);
+        assert(*(jsonReadDoublel(root, _INDEX(4))) == jsonNum1);
 
-        char *tdvTestString = "tdv test string";
-        struct path *keystdv[] = { _KEY("5"), NULL };
-        jsonUpdatetdv(tdvTestString, JSON_STR, newroot, keystdv);
-        JsonNode *nodetdv = jsonReadnsv(newroot, keystdv);
-        assert(nodetdv != NULL);
-        assert(nodetdv->contents.s != NULL);
-        assert(strcmp(tdvTestString, nodetdv->contents.s) == 0);
-
-        jsonUpdatendl(nodetdl, newroot, _KEY("1"), NULL);
-        JsonNode *nodendl = jsonReadnsl(newroot, _KEY("1"), NULL);
-        assert(nodendl != NULL);
-        assert(nodendl->contents.s != NULL);
-        assert(strcmp(tdlTestString, nodendl->contents.s) == 0);
-
-        struct path *keysndv[] = { _KEY("all"), _INDEX(5), NULL };
-        jsonUpdatendv(nodetdv, newroot, keysndv);
-        JsonNode *nodendv = jsonReadnsv(newroot, keysndv);
-        assert(nodendv != NULL);
-        assert(nodendv->contents.s != NULL);
-        assert(strcmp(tdvTestString, nodendv->contents.s) == 0);
+        struct json_path_partial *path_literal[] = { _INDEX(2), NULL };
+        assert(jsonUpdatev(&jsonNum2, newType, root, path_literal) != NULL);
+        new = jsonReadv(root, path_literal);
+        assert(new != NULL);
+        assert(*(jsonReadDoublev(root, path_literal)) == jsonNum2);
     }
 
+    // Test strings
     {
-        //JsonNode *updatensl = NULL, *updatensv = NULL, *updatetsl = NULL, *updatetsv = NULL;
+        jsonType newType = JSON_STR;
+        char *tmpString = NULL;
+        char *jsonStr1 = "here is the first string!";
+        char *jsonStr2 = "AND THIS IS THE SECOND!";
+
+        assert(jsonUpdatel(jsonStr1, newType, root, _INDEX(4)));
+        new = jsonReadl(root, _INDEX(4));
+        assert(new != NULL);
+        tmpString = jsonReadStrl(root, _INDEX(4));
+        assert(!strcmp(tmpString, jsonStr1));
+
+        struct json_path_partial *path_literal[] = { _INDEX(2), NULL };
+        assert(jsonUpdatev(jsonStr2, newType, root, path_literal) != NULL);
+        new = jsonReadv(root, path_literal);
+        assert(new != NULL);
+        tmpString = jsonReadStrv(root, path_literal);
+        assert(!strcmp(tmpString, jsonStr2));
     }
 
+    FILE *debug_out = fopen("./tmp/jsonUpdate.debug.json", "w");
+    assert(debug_out != NULL);
+    jsonOut(debug_out, 0, root);
+    assert(fclose(debug_out) == 0);
     jsonLibEnd();
 }
+
+void jsonCopy_tests() {
+    jsonLibInit();
+    JsonNode *root = jsonOpen("./tests/test2.json");
+    assert(root != NULL);
+    JsonNode *new = NULL;
+
+    // Test literals
+    {
+        jsonType newType = JSON_LITERAL;
+        jsonLiteral trueLiteral = JSON_TRUE;
+        jsonLiteral falseLiteral = JSON_FALSE;
+        JsonNode *trueNode = jsonCreate(&trueLiteral, newType);
+        JsonNode *falseNode = jsonCreate(&falseLiteral, newType);
+
+        // copy to array
+        {
+            assert(jsonCopyl(trueNode, root, _INDEX(111)) != NULL);
+            new = jsonReadl(root, _INDEX(111));
+            assert(trueNode != NULL);
+            assert(new != NULL);
+            assert(trueNode != new);
+            assert(*jsonReadLiteral(trueNode) == *jsonReadLiteral(new));
+            assert(*jsonReadLiteral(falseNode) != *jsonReadLiteral(new));
+
+            struct json_path_partial *array_pathv[] = { _INDEX(112), NULL };
+            assert(jsonCopyv(trueNode, root, array_pathv) != NULL);
+            new = jsonReadv(root, array_pathv);
+            assert(trueNode != NULL);
+            assert(new != NULL);
+            assert(trueNode != new);
+            assert(*jsonReadLiteral(trueNode) == *jsonReadLiteral(new));
+            assert(*jsonReadLiteral(falseNode) != *jsonReadLiteral(new));
+        }
+
+        // copy to object
+        {
+            assert(jsonCopyl(trueNode, root, _INDEX(5), _KEY("111")) != NULL);
+            new = jsonReadl(root, _INDEX(5), _KEY("111"));
+            assert(trueNode != NULL);
+            assert(new != NULL);
+            assert(trueNode != new);
+            assert(*jsonReadLiteral(trueNode) == *jsonReadLiteral(new));
+            assert(*jsonReadLiteral(falseNode) != *jsonReadLiteral(new));
+
+            struct json_path_partial *object_pathv[] = { _INDEX(5), _KEY("112"), NULL };
+            assert(jsonCopyv(falseNode, root, object_pathv) != NULL);
+            new = jsonReadv(root, object_pathv);
+            assert(falseNode != NULL);
+            assert(new != NULL);
+            assert(trueNode != new);
+            assert(*jsonReadLiteral(trueNode) != *jsonReadLiteral(new));
+            assert(*jsonReadLiteral(falseNode) == *jsonReadLiteral(new));
+        }
+    }
+
+    // Test doubles
+    {
+        jsonType newType = JSON_NUM;
+        double onePointo = 1.0;
+        double twoPointo = 2.0;
+        double threePointo = 3.0;
+        double fourPointo = 4.0;
+        JsonNode *oneNode = jsonCreate(&onePointo, newType);
+        JsonNode *twoNode = jsonCreate(&twoPointo, newType);
+        JsonNode *threeNode = jsonCreate(&threePointo, newType);
+        JsonNode *fourNode = jsonCreate(&fourPointo, newType);
+
+        // copy to array
+        {
+            assert(jsonCopyl(oneNode, root, _INDEX(121)) != NULL);
+            new = jsonReadl(root, _INDEX(121));
+            assert(oneNode != NULL);
+            assert(new != NULL);
+            assert(oneNode != new);
+            assert(*jsonReadDouble(oneNode) == *jsonReadDouble(new));
+            assert(*jsonReadDouble(twoNode) != *jsonReadDouble(new));
+
+            struct json_path_partial *array_pathv[] = { _INDEX(122), NULL };
+            assert(jsonCopyv(twoNode, root, array_pathv) != NULL);
+            new = jsonReadv(root, array_pathv);
+            assert(twoNode != NULL);
+            assert(new != NULL);
+            assert(twoNode != new);
+            assert(*jsonReadDouble(twoNode) == *jsonReadDouble(new));
+            assert(*jsonReadDouble(oneNode) != *jsonReadDouble(new));
+        }
+
+        // copy to object
+        {
+            assert(jsonCopyl(threeNode, root, _INDEX(5), _KEY("121")) != NULL);
+            new = jsonReadl(root, _INDEX(5), _KEY("121"));
+            assert(threeNode != NULL);
+            assert(new != NULL);
+            assert(threeNode != new);
+            assert(*jsonReadDouble(threeNode) == *jsonReadDouble(new));
+            assert(*jsonReadDouble(fourNode) != *jsonReadDouble(new));
+
+            struct json_path_partial *object_pathv[] = { _INDEX(5), _KEY("122"), NULL };
+            assert(jsonCopyv(fourNode, root, object_pathv) != NULL);
+            new = jsonReadv(root, object_pathv);
+            assert(fourNode != NULL);
+            assert(new != NULL);
+            assert(fourNode != new);
+            assert(*jsonReadDouble(threeNode) != *jsonReadDouble(new));
+            assert(*jsonReadDouble(fourNode) == *jsonReadDouble(new));
+        }
+    }
+
+    // Test strings
+    {
+        jsonType newType = JSON_STR;
+        char *oneString = "1.0";
+        char *twoString = "2.0";
+        char *threeString = "3.0";
+        char *fourString = "4.0";
+        JsonNode *oneNode = jsonCreate(oneString, newType);
+        JsonNode *twoNode = jsonCreate(twoString, newType);
+        JsonNode *threeNode = jsonCreate(threeString, newType);
+        JsonNode *fourNode = jsonCreate(fourString, newType);
+
+        // copy to array
+        {
+            assert(jsonCopyl(oneNode, root, _INDEX(131)) != NULL);
+            new = jsonReadl(root, _INDEX(131));
+            assert(oneNode != NULL);
+            assert(new != NULL);
+            assert(oneNode != new);
+            assert(strcmp(jsonReadStr(oneNode), jsonReadStr(new)) == 0);
+            assert(strcmp(jsonReadStr(twoNode), jsonReadStr(new)) != 0);
+
+            struct json_path_partial *array_pathv[] = { _INDEX(132), NULL };
+            assert(jsonCopyv(twoNode, root, array_pathv) != NULL);
+            new = jsonReadv(root, array_pathv);
+            assert(twoNode != NULL);
+            assert(new != NULL);
+            assert(twoNode != new);
+            assert(strcmp(jsonReadStr(twoNode), jsonReadStr(new)) == 0);
+            assert(strcmp(jsonReadStr(oneNode), jsonReadStr(new)) != 0);
+        }
+
+        // copy to object
+        {
+            assert(jsonCopyl(threeNode, root, _INDEX(5), _KEY("131")) != NULL);
+            new = jsonReadl(root, _INDEX(5), _KEY("131"));
+            assert(threeNode != NULL);
+            assert(new != NULL);
+            assert(threeNode != new);
+            assert(strcmp(jsonReadStr(threeNode), jsonReadStr(new)) == 0);
+            assert(strcmp(jsonReadStr(fourNode), jsonReadStr(new)) != 0);
+
+            struct json_path_partial *object_pathv[] = { _INDEX(5), _KEY("132"), NULL };
+            assert(jsonCopyv(fourNode, root, object_pathv) != NULL);
+            new = jsonReadv(root, object_pathv);
+            assert(fourNode != NULL);
+            assert(new != NULL);
+            assert(fourNode != new);
+            assert(strcmp(jsonReadStr(fourNode), jsonReadStr(new)) == 0);
+            assert(strcmp(jsonReadStr(threeNode), jsonReadStr(new)) != 0);
+        }
+    }{
+        jsonType newType = JSON_STR;
+        char *oneString = "1.0";
+        char *twoString = "2.0";
+        char *threeString = "3.0";
+        char *fourString = "4.0";
+        JsonNode *oneNode = jsonCreate(oneString, newType);
+        JsonNode *twoNode = jsonCreate(twoString, newType);
+        JsonNode *threeNode = jsonCreate(threeString, newType);
+        JsonNode *fourNode = jsonCreate(fourString, newType);
+
+        // copy to array
+        {
+            FILE *debug_out = fopen("./tmp/jsonCopy.debug.json", "w");
+            assert(debug_out != NULL);
+            jsonOut(debug_out, 0, root);
+            assert(fclose(debug_out) == 0);
+
+            assert(jsonCopyl(oneNode, root, _INDEX(131)) != NULL);
+            new = jsonReadl(root, _INDEX(131));
+            assert(oneNode != NULL);
+            assert(new != NULL);
+            assert(oneNode != new);
+            assert(strcmp(jsonReadStr(oneNode), jsonReadStr(new)) == 0);
+            assert(strcmp(jsonReadStr(twoNode), jsonReadStr(new)) != 0);
+
+            debug_out = fopen("./tmp/jsonCopy.debug.json", "w");
+            assert(debug_out != NULL);
+            jsonOut(debug_out, 0, root);
+            assert(fclose(debug_out) == 0);
+
+            struct json_path_partial *array_pathv[] = { _INDEX(132), NULL };
+            assert(jsonCopyv(twoNode, root, array_pathv) != NULL);
+            new = jsonReadv(root, array_pathv);
+            assert(twoNode != NULL);
+            assert(new != NULL);
+            assert(twoNode != new);
+            assert(strcmp(jsonReadStr(twoNode), jsonReadStr(new)) == 0);
+            assert(strcmp(jsonReadStr(oneNode), jsonReadStr(new)) != 0);
+        }
+
+        // copy to object
+        {
+            assert(jsonCopyl(threeNode, root, _INDEX(5), _KEY("131")) != NULL);
+            new = jsonReadl(root, _INDEX(5), _KEY("131"));
+            assert(threeNode != NULL);
+            assert(new != NULL);
+            assert(threeNode != new);
+            assert(strcmp(jsonReadStr(threeNode), jsonReadStr(new)) == 0);
+            assert(strcmp(jsonReadStr(fourNode), jsonReadStr(new)) != 0);
+
+            struct json_path_partial *object_pathv[] = { _INDEX(5), _KEY("132"), NULL };
+            assert(jsonCopyv(fourNode, root, object_pathv) != NULL);
+            new = jsonReadv(root, object_pathv);
+            assert(fourNode != NULL);
+            assert(new != NULL);
+            assert(fourNode != new);
+            assert(strcmp(jsonReadStr(fourNode), jsonReadStr(new)) == 0);
+            assert(strcmp(jsonReadStr(threeNode), jsonReadStr(new)) != 0);
+        }
+    }
+
+
+    FILE *debug_out = fopen("./tmp/jsonCopy.debug.json", "w");
+    assert(debug_out != NULL);
+    jsonOut(debug_out, 0, root);
+    assert(fclose(debug_out) == 0);
+    jsonLibEnd();
+}
+
 
 int main() {
     read_tests();
     array_tests();
     object_tests();
     copy_tests();
-    interface_tests();
     output_tests();
 
-    jsonCreate_tests();
     jsonRead_tests();
+    //jsonDelete_tests(); // TODO: Implement jsonClose before testing this
     jsonUpdate_tests();
+    jsonCopy_tests();
+    //jsonCreate_tests();
 
     printf("tests completed\n");
     return 0;
