@@ -2395,65 +2395,64 @@ void jsonCopy_tests() {
             assert(strcmp(jsonReadStr(fourNode), jsonReadStr(new)) == 0);
             assert(strcmp(jsonReadStr(threeNode), jsonReadStr(new)) != 0);
         }
-    }{
-        jsonType newType = JSON_STR;
-        char *oneString = "1.0";
-        char *twoString = "2.0";
-        char *threeString = "3.0";
-        char *fourString = "4.0";
-        JsonNode *oneNode = jsonCreate(oneString, newType);
-        JsonNode *twoNode = jsonCreate(twoString, newType);
-        JsonNode *threeNode = jsonCreate(threeString, newType);
-        JsonNode *fourNode = jsonCreate(fourString, newType);
+    }
+
+    // Test arrays
+    {
+        JsonNode *array = jsonReadl(root, _INDEX(0), _KEY("all"));
 
         // copy to array
         {
-            FILE *debug_out = fopen("./tmp/jsonCopy.debug.json", "w");
-            assert(debug_out != NULL);
-            jsonOut(debug_out, 0, root);
-            assert(fclose(debug_out) == 0);
+            JsonNode *one = NULL;
 
-            assert(jsonCopyl(oneNode, root, _INDEX(131)) != NULL);
-            new = jsonReadl(root, _INDEX(131));
-            assert(oneNode != NULL);
+            assert(jsonCopyl(array, root, _INDEX(141)) != NULL);
+            new = jsonReadl(root, _INDEX(141));
+            assert(array != NULL);
             assert(new != NULL);
-            assert(oneNode != new);
-            assert(strcmp(jsonReadStr(oneNode), jsonReadStr(new)) == 0);
-            assert(strcmp(jsonReadStr(twoNode), jsonReadStr(new)) != 0);
+            assert(array != new);
+            one = jsonReadl(root, _INDEX(141), _INDEX(0));
+            assert(one != NULL);
+            assert(jsonReadDouble(one) != NULL);
+            assert(*jsonReadDouble(one) == 1.0);
 
-            debug_out = fopen("./tmp/jsonCopy.debug.json", "w");
-            assert(debug_out != NULL);
-            jsonOut(debug_out, 0, root);
-            assert(fclose(debug_out) == 0);
-
-            struct json_path_partial *array_pathv[] = { _INDEX(132), NULL };
-            assert(jsonCopyv(twoNode, root, array_pathv) != NULL);
+            struct json_path_partial *array_pathv[] = { _INDEX(142), NULL };
+            assert(jsonCopyv(array, root, array_pathv) != NULL);
             new = jsonReadv(root, array_pathv);
-            assert(twoNode != NULL);
+            assert(array != NULL);
             assert(new != NULL);
-            assert(twoNode != new);
-            assert(strcmp(jsonReadStr(twoNode), jsonReadStr(new)) == 0);
-            assert(strcmp(jsonReadStr(oneNode), jsonReadStr(new)) != 0);
+            assert(array != new);
+            struct json_path_partial *array_pathv2[] = { _INDEX(142), _INDEX(0), NULL };
+            one = jsonReadv(root, array_pathv2);
+            assert(one != NULL);
+            assert(jsonReadDouble(one) != NULL);
+            assert(*jsonReadDouble(one) == 1.0);
         }
 
         // copy to object
         {
-            assert(jsonCopyl(threeNode, root, _INDEX(5), _KEY("131")) != NULL);
-            new = jsonReadl(root, _INDEX(5), _KEY("131"));
-            assert(threeNode != NULL);
-            assert(new != NULL);
-            assert(threeNode != new);
-            assert(strcmp(jsonReadStr(threeNode), jsonReadStr(new)) == 0);
-            assert(strcmp(jsonReadStr(fourNode), jsonReadStr(new)) != 0);
+            JsonNode *eight = NULL;
 
-            struct json_path_partial *object_pathv[] = { _INDEX(5), _KEY("132"), NULL };
-            assert(jsonCopyv(fourNode, root, object_pathv) != NULL);
-            new = jsonReadv(root, object_pathv);
-            assert(fourNode != NULL);
+            assert(jsonCopyl(array, root, _INDEX(5), _KEY("test_arrayl")) != NULL);
+            new = jsonReadl(root, _INDEX(5), _KEY("test_arrayl"));
+            assert(array != NULL);
             assert(new != NULL);
-            assert(fourNode != new);
-            assert(strcmp(jsonReadStr(fourNode), jsonReadStr(new)) == 0);
-            assert(strcmp(jsonReadStr(threeNode), jsonReadStr(new)) != 0);
+            assert(array != new);
+            eight = jsonReadl(root, _INDEX(5), _KEY("test_arrayl"), _INDEX(7));
+            assert(eight != NULL);
+            assert(jsonReadDouble(eight) != NULL);
+            assert(*jsonReadDouble(eight) == 8.0);
+
+            struct json_path_partial *array_pathv[] = { _INDEX(5), _KEY("test_arrayv"), NULL };
+            assert(jsonCopyv(array, root, array_pathv) != NULL);
+            new = jsonReadv(root, array_pathv);
+            assert(array != NULL);
+            assert(new != NULL);
+            assert(array != new);
+            struct json_path_partial *array_pathv2[] = { _INDEX(5), _KEY("test_arrayv"), _INDEX(7), NULL };
+            eight = jsonReadv(root, array_pathv2);
+            assert(eight != NULL);
+            assert(jsonReadDouble(eight) != NULL);
+            assert(*jsonReadDouble(eight) == 8.0);
         }
     }
 
@@ -2477,7 +2476,7 @@ int main() {
     //jsonDelete_tests(); // TODO: Implement jsonClose before testing this
     jsonUpdate_tests();
     jsonCopy_tests();
-    //jsonCreate_tests();
+    jsonCreate_tests();
 
     printf("tests completed\n");
     return 0;
