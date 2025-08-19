@@ -44,6 +44,10 @@ pool.o: pool.c
 clean:
 	rm -f json tags *.ast *.pch *.plist *.o externalDefMap.txt gmon.out
 
+.PHONY: tags
+tags:
+	ctags -R .
+
 format: ${DEPENDS}
 	clang-format -i ${DEPENDS}
 

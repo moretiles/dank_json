@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stddef.h>
+#include <stdbool.h>
 
 /*
  * json node flags
@@ -9,10 +10,12 @@
  */
 #define JSON_ELEM_IS_HEAD (1 << 7)
 #define JSON_ELEM_IS_TAIL (1 << 6)
-
-#define JSON_NUM_IS_NUM (1 << 0)
-#define JSON_NUM_IS_SCIENTIFIC (1 << 1)
+#define JSON_ELEM_CONTENTS_ON_HEAP (1 << 5)
+//#define ... (1 << 4)
+//#define ... (1 << 3)
 #define JSON_NUM_IS_INT (1 << 2)
+#define JSON_NUM_IS_SCIENTIFIC (1 << 1)
+#define JSON_NUM_IS_NUM (1 << 0)
 
 // #define FNV_PRIME (pow(2, 40) + pow(2, 8) + 0x3b)
 #define FNV_PRIME (1099511628091)
@@ -31,6 +34,11 @@
 #define JSON_NUM (1 << 4)
 #define JSON_ARRAY (1 << 5)
 #define JSON_OBJECT (1 << 6)
+#define JSON_CLOSE (1 << 7)
+
+typedef uint8_t jsonType;
+typedef uint8_t jsonFlags;
+typedef uint8_t jsonLiteral;
 
 /*
  * Possible values for literal
@@ -47,12 +55,12 @@
  * n is for holding the pointer to the next free node
  */
 union json_union {
-  char l;
-  double d;
-  char *s;
-  struct json_node *a;
-  struct ht *o;
-  struct json_node *n;
+    jsonLiteral l;
+    double d;
+    char *s;
+    struct json_node *a;
+    struct ht *o;
+    struct json_node *n;
 };
 
 /*
@@ -67,11 +75,11 @@ union json_union {
  * (flags & JSON_ELEM_IS_TAIL) then next goes to head.
  */
 typedef struct json_node {
-  union json_union contents;
-  char type;
-  char flags;
-  struct json_node *prev;
-  struct json_node *next;
+    union json_union contents;
+    jsonType type;
+    jsonFlags flags;
+    struct json_node *prev;
+    struct json_node *next;
 } JsonNode;
 
 /* Just a linked list */
@@ -104,28 +112,43 @@ struct json_object {
  * Pool allocator
  */
 struct json_pool {
-  JsonNode *items;
-  size_t stored;
-  size_t cap;
-  JsonNode *next_free;
-  struct json_pool *prev;
+    JsonNode *items;
+    size_t stored;
+    size_t cap;
+    JsonNode *next_free;
+    struct json_pool *prev;
 };
 
 struct ht {
-  char **keys;
-  JsonNode **vals;
-  size_t count;
-  size_t cap;
+    char **keys;
+    JsonNode **vals;
+    size_t count;
+    size_t cap;
 };
 
 union path_holds {
-  size_t index;
-  char *key;
+    size_t index;
+    char *key;
 };
 
+/*
 typedef struct path {
-  union path_holds path;
-  uint8_t type;
-  struct path *next;
+    union path_holds path;
+    uint8_t type;
+    struct path *next;
+} JsonPath;
+*/
+
+struct json_path_partial {
+    union path_holds path;
+    jsonType type;
+    struct json_path_partial *prev;
+    struct json_path_partial *next;
+};
+
+typedef struct json_path {
+    struct json_path_partial *head;
+    struct json_path_partial *tail;
+    size_t members;
 } JsonPath;
 #endif

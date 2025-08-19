@@ -35,13 +35,13 @@ int jsonLibEnd();
  */
 
 #define _KEY(k)                                                                \
-  &((struct path) {.path.key = k, .type = JSON_OBJECT, .next = NULL})
+  &((struct json_path_partial) {.path.key = k, .type = JSON_OBJECT, .prev = NULL, .next = NULL})
 
 /*
  * Expresses an offset as an index to be used when accessing an array's fields.
  */
 #define _INDEX(i)                                                              \
-  &((struct path) {.path.index = i, .type = JSON_ARRAY, .next = NULL})
+  &((struct json_path_partial) {.path.index = i, .type = JSON_ARRAY, .prev = NULL, .next = NULL})
 
 /*
  * Provides you with a new node.
@@ -53,64 +53,95 @@ int jsonLibEnd();
  * 2. Calling jsonClose on the file associated with this node.
  * 3. Calling jsonEnd.
  */
-JsonNode *jsonCreate();
-JsonNode *jsonCreatets(void *src, char type);
-JsonNode *jsonCreatetd(void *src, char type);
-#define jsonCreatensl(root, args...) cmemcpy(node, jsonCreatndl(&((JsonNode) {.contents.a = NULL, .type = JSON_ARRAY, .flags = 0, .prev = NULL, .next = NULL}), root, ##args), sizeof(JsonNode))
-JsonNode *jsonCreatensv(JsonNode *node, JsonNode *root, struct path **keys);
-JsonNode *jsonCreatendl(JsonNode *node, JsonNode *root, ...);
-JsonNode *jsonCreatendv(JsonNode *node, JsonNode *root, struct path **keys);
-// both Createt* functions can leak memory
-#define jsonCreatetsl(src, type, root, args...) jsonCreatensl(jsonCreatets(src, type), root, ...)
-#define jsonCreatetdl(src, type, root, args...) jsonCreatensl(jsonCopy(src, type), root, ...)
-JsonNode *jsonCreatetsv(void *src, char type, JsonNode *root, struct path **keys);
-JsonNode *jsonCreatetdv(void *src, char type, JsonNode *root, struct path **keys);
+//JsonNode *jsonCreate();
+JsonNode *_jsonCreate();
+//JsonNode *jsonCreatetd(void *src, char type);
+JsonNode *jsonCreate(void *src, char type);
+//#define jsonCreatetdl(src, type, root, args...) jsonCreatensl(jsonCopy(src, type), root, ##args NULL)
+#define jsonCreatel(src, type, root, args...) jsonUpdate(src, type, jsonCopyl(_jsonCreate(), root, ##args, NULL))
+//JsonNode *jsonCreatetdv(void *src, char type, JsonNode *root, struct json_path_partial **keys);
+JsonNode *jsonCreatev(void *src, char type, JsonNode *root, struct json_path_partial **keys);
+//JsonNode *jsonCreatets(void *src, char type);
+//#define jsonCreatetsl(src, type, root, args...) jsonCreatensl(jsonCreatets(src, type), root, ##args, NULL)
+//#define jsonCreatensl(root, args...) cmemcpy(jsonCreatndl(&((JsonNode) {.contents.a = NULL, .type = JSON_ARRAY, .flags = 0, .prev = NULL, .next = NULL}), node, root, ##args, NULL), sizeof(JsonNode))
+//JsonNode *jsonCreatetsv(void *src, char type, JsonNode *root, struct json_path_partial **keys);
+//JsonNode *jsonCreatensv(JsonNode *node, JsonNode *root, struct json_path_partial **keys);
 
 // read
-JsonNode *jsonReadnd(JsonNode *elem);
-JsonNode *jsonReadnsl(JsonNode *root, ...);
-JsonNode *jsonReadnsv(JsonNode *root, struct path **keys);
-JsonNode *jsonReadnd(JsonNode *elem);
-#define jsonReadndl(root, args...) jsonReadnd(jsonReadnsl(root, ##args))
-JsonNode *jsonReadndv(JsonNode *root, struct path **keys);
+//JsonNode *jsonReadnsl(JsonNode *root, ...);
+JsonNode *_jsonReadl(JsonNode *root, ...);
+#define jsonReadl(root, args...) _jsonReadl((root), ##args, NULL)
+//JsonNode *jsonReadnsv(JsonNode *root, struct json_path_partial **keys);
+JsonNode *jsonReadv(JsonNode *root, struct json_path_partial **keys);
 // ts* family expect a char**
-int jsonReadts(void *dest, char type, JsonNode *root);
-#define jsonReadtsl(dest, type, root, args...)                                   \
-  jsonReadts(dest, type, jsonReadnsl(root, ##args))
-int jsonReadtsv(void *dest, char type, JsonNode *root, struct path **keys);
-int jsonReadtd(void *dest, char type, JsonNode *root);
-#define jsonReadtdl(dest, type, root, args...)                                   \
-  jsonReadtd(dest, type, jsonReadnsl(root, ##args))
-int jsonReadtdv(void *dest, char type, JsonNode *root, struct path **keys);
+//JsonNode *jsonReadts(void *dest, char type, JsonNode *root);
+//#define jsonReadtsl(dest, type, root, args...) jsonReadts(dest, type, jsonReadnsl(root, ##args, NULL))
+//JsonNode *jsonReadtsv(void *dest, char type, JsonNode *root, struct json_path_partial **keys);
+//JsonNode *jsonReadtd(void *dest, char type, JsonNode *root);
+//#define jsonReadtdl(dest, type, root, args...) jsonReadtd(dest, type, jsonReadnsl(root, ##args, NULL))
+//JsonNode *jsonReadtdv(void *dest, char type, JsonNode *root, struct json_path_partial **keys);
+//JsonNode *jsonReadnd(JsonNode *elem);
+//#define jsonReadndl(root, args...) jsonReadnd(jsonReadnsl(root, ##args, NULL))
+//JsonNode *jsonReadndv(JsonNode *root, struct json_path_partial **keys);
 
-// bad interface for update method methods ts/tsv return JsonNode* while td/tdv return int
 // update
-int jsonUpdatetd(void *src, char type, JsonNode *root);
-JsonNode *jsonUpdatend(JsonNode *src, JsonNode *root);
-#define jsonUpdatendl(src, root, args...) jsonUpdatend(src, jsonReadnsl(root, ##args))
-JsonNode *jsonUpdatendv(JsonNode *src, JsonNode *root, struct path **keys);
-#define jsonUpdatetdl(src, type, root, args...)                                     \
-  jsonUpdatetd(src, type, jsonReadnsl(root, ##args))
-int jsonUpdatetdv(void *src, char type, JsonNode *root, struct path **keys);
-JsonNode *jsonUpdatets(void *src, char type, JsonNode *root);
-#define jsonUpdatensl(src, root, args...) jsonUpdatens(src, jsonReadnsl(root, ##args))
-JsonNode *jsonUpdatensv(JsonNode *src, JsonNode *root, struct path **keys);
-#define jsonUpdatetsl(src, type, root, args...)                                     \
-  jsonUpdatets(src, type, jsonReadnsl(root, ##args))
-JsonNode *jsonUpdatetsv(void *src, char type, JsonNode *root, struct path **keys);
+//JsonNode *jsonUpdatetd(void *src, char type, JsonNode *root);
+JsonNode *jsonUpdate(void *src, char type, JsonNode *root);
+//#define jsonUpdatetdl(src, type, root, args...) jsonUpdatetd(src, type, jsonReadnsl(root, ##args))
+#define jsonUpdatel(src, type, root, args...) jsonUpdate(src, type, jsonReadl(root, ##args, NULL))
+//JsonNode *jsonUpdatetdv(void *src, char type, JsonNode *root, struct json_path_partial **keys);
+JsonNode *jsonUpdatev(void *src, char type, JsonNode *root, struct json_path_partial **keys);
+//JsonNode *jsonUpdatens(JsonNode *src, JsonNode *root);
+//JsonNode *jsonUpdatend(JsonNode *src, JsonNode *root);
+//#define jsonUpdatendl(src, root, args...) jsonUpdatend(src, jsonReadnsl(root, ##args))
+//JsonNode *jsonUpdatendv(JsonNode *src, JsonNode *root, struct json_path_partial **keys);
+//JsonNode *jsonUpdatets(void *src, char type, JsonNode *root);
+//#define jsonUpdatensl(src, root, args...) jsonUpdatens(src, jsonReadnsl(root, ##args))
+//JsonNode *jsonUpdatensv(JsonNode *src, JsonNode *root, struct json_path_partial **keys);
+//#define jsonUpdatetsl(src, type, root, args...) jsonUpdatets(src, type, jsonReadnsl(root, ##args))
+//JsonNode *jsonUpdatetsv(void *src, char type, JsonNode *root, struct json_path_partial **keys);
+
+// copy
+JsonNode *jsonCopy(JsonNode *root);
+//JsonNode *jsonCreatendl(JsonNode *node, JsonNode *root, ...);
+//JsonNode *jsonCopyl(JsonNode *node, JsonNode *root, ...);
+JsonNode *_jsonCopyl(JsonNode *node, JsonNode *root, ...);
+#define jsonCopyl(node, root, args...) _jsonCopyl((node), (root), ##args, NULL)
+//JsonNode *jsonCreatendv(JsonNode *node, JsonNode *root, struct json_path_partial **keys);
+JsonNode *jsonCopyv(JsonNode *src, JsonNode *root, struct json_path_partial **keys);
 
 // delete
 JsonNode *jsonDelete(JsonNode *elem);
-#define jsonDeletel(root, args...) jsonDelete(jsonReadnsl(root, ##args))
-JsonNode *jsonDeletev(JsonNode *root, struct path **keys);
+#define jsonDeletel(root, args...) jsonDelete(jsonReadl(root, ##args, NULL))
+JsonNode *jsonDeletev(JsonNode *root, struct json_path_partial **keys);
+
+// check type
+jsonType *jsonCheckType(JsonNode *root);
+#define jsonCheckTypel(root, args...) jsonCheckType(jsonReadl(root, ##args NULL))
+jsonType *jsonCheckTypev(JsonNode *root, struct json_path_partial **keys);
+
+// read{type}
+jsonLiteral *jsonReadLiteral(JsonNode *root);
+#define jsonReadLiterall(root, args...) jsonReadLiteral(jsonReadl(root, ##args, NULL))
+jsonLiteral *jsonReadLiteralv(JsonNode *root, struct json_path_partial **keys);
+double *jsonReadDouble(JsonNode *root);
+#define jsonReadDoublel(root, args...) jsonReadDouble(jsonReadl(root, ##args, NULL))
+double *jsonReadDoublev(JsonNode *root, struct json_path_partial **keys);
+char *jsonReadStr(JsonNode *root);
+#define jsonReadStrl(root, args...) jsonReadStr(jsonReadl(root, ##args, NULL))
+char *jsonReadStrv(JsonNode *root, struct json_path_partial **keys);
+JsonNode *jsonReadArray(JsonNode *root);
+#define jsonReadArrayl(root, args...) jsonReadArray(jsonReadl(root, ##args, NULL))
+JsonNode *jsonReadArrayv(JsonNode *root, struct json_path_partial **keys);
+JsonNode *jsonReadObject(JsonNode *root);
+#define jsonReadObjectl(root, args...) jsonReadObject(jsonReadl(root, ##args, NULL))
+JsonNode *jsonReadObjectv(JsonNode *root, struct json_path_partial **keys);
 
 // output json structure and children as string
 int jsonOut(FILE *dest, char minify, JsonNode *elem);
-int jsonOutRecurse(struct queue *dest, char minify, int offset,
-                      JsonNode *elem);
 #define jsonOutl(dest, minify, root, args...)                               \
-  jsonOut(dest, minify, jsonReadnsl(root, ##args))
-int jsonOutv(FILE *dest, char minify, JsonNode *root, struct path **keys);
+  jsonOut(dest, minify, jsonReadl(root, ##args, NULL))
+int jsonOutv(FILE *dest, char minify, JsonNode *root, struct json_path_partial **keys);
 
 /*
  *
@@ -141,15 +172,19 @@ char *get_json_str(struct queue *read, struct queue *scratch);
 static inline double get_json_num(char *str);
 JsonNode *new_node(struct json_pool *pool);
 JsonNode *copy_json_node(JsonNode *dest, JsonNode *src);
+JsonNode *copy_json_node_preserve_references(JsonNode *dest, JsonNode *src);
 JsonNode *destroy_node(struct json_pool *pool, JsonNode *elem);
 JsonNode *process(struct queue *file, JsonNode *elem);
+
+// internal output function
+int json_out_recurse(struct queue *dest, char minify, int offset, JsonNode *elem);
 
 // test
 void read_tests();
 void array_tests();
 void object_tests();
 void copy_tests();
-void interface_tests();
+void jsonRead_tests();
 
 void jsonCreate_tests();
 void jsonRead_tests();

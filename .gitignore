@@ -32,3 +32,6 @@ externalDefMap.txt
 
 # gprof
 gmon.out
+
+# tests
+*.debug.json

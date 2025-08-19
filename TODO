@@ -1,14 +1,29 @@
 Progress map
 
-* Write tests for the jsonCreate, jsonRead, jsonUpdate families.
+Immediate
+* Refactor path struct as path_component, create actual path struct that holds a linked list of path components and functions as a kind of stack. Path struct would have push, pop, and clear functions.
+```
+typedef struct path {
+    PathComponent *head;
+    PathComponent *tail;
+    size_t members;
+} Path;
+```
+* Refactor functions related to deep copying a read as copying
+* Removes tests related to shallow copy
+* Use type aliased to char for flags
+* Use type aliased to char for type that a node holds
+* Implement jsonCheckType and jsonRead${TYPE} functions
+
+Core functionality
+* Handle memory leaks for jsonCreate family
 * Give structs better names in the public interface.
 
-CORE FUNCTIONALITY WORKING
-
+Nice to have:
 * Make sure JSON dictionaries are sorted in the same order as input.
-* Make sure we allocate dictionaries using a pool.
-* Try out a malloc bins style string allocation method.
-* Add error queue.
 * Use wchar_t for strings to properly handle 2 byte escapes (like \xabcd).
+* Use prev and next to connect together active nodes in a dictionary (saving deallocation time).
+
+Maybe:
+* Make sure we allocate dictionaries using a pool.
 * Use global zero initialized node to populate initial dictionary so we only "waste" memory on pointers, not nodes
-* Store linked list of active nodes in pool so that most of the time the program spends is not checking if nonexistant nodes need to be deallocated
