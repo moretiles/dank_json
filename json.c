@@ -143,6 +143,7 @@ JsonNode *jsonCreate(void *src, char type) {
         break;
 
     case JSON_ARRAY:
+        new->contents.a = NULL;
         break;
 
     case JSON_OBJECT:
@@ -646,7 +647,7 @@ JsonNode *jsonUpdatendv(JsonNode *src, JsonNode *root, struct json_path_partial 
 
 //JsonNode *jsonUpdatetd(void *src, char type, JsonNode *root) {
 JsonNode *jsonUpdate(void *src, char type, JsonNode *root) {
-    if (src == NULL || root == NULL) {
+    if ((src == NULL && type != JSON_ARRAY && type != JSON_OBJECT) || root == NULL) {
         return NULL;
     }
     int mask = 0xf0;
@@ -677,6 +678,35 @@ JsonNode *jsonUpdate(void *src, char type, JsonNode *root) {
         root->type = type;
         root->flags &= mask;
         root->contents.l = *(char *)src;
+        break;
+
+    case JSON_ARRAY:
+        root->type = type;
+        root->flags &= mask;
+        root->contents.a = NULL;
+        break;
+
+    case JSON_OBJECT:
+        root->contents.o = calloc(1, sizeof(struct ht));
+        root->flags &= mask;
+        root->type = JSON_OBJECT;
+        if (root->contents.o == NULL) {
+            jsonDelete(root);
+            return NULL;
+        }
+        char **keys = calloc(OBJECT_STARTING_SIZE, sizeof(char *));
+        JsonNode **vals = calloc(OBJECT_STARTING_SIZE, sizeof(JsonNode *));
+        if (root->contents.o == NULL || keys == NULL || vals == NULL) {
+            free(root->contents.o);
+            free(keys);
+            free(vals);
+            jsonDelete(root);
+            return NULL;
+        }
+        root->contents.o->keys = keys;
+        root->contents.o->vals = vals;
+        root->contents.o->count = 0;
+        root->contents.o->cap = OBJECT_STARTING_SIZE;
         break;
 
     default:
@@ -2066,42 +2096,292 @@ void jsonCreate_tests() {
     jsonLibInit();
     JsonNode *root = jsonOpen("./tests/test2.json");
     assert(root != NULL);
-    jsonLiteral new_literal = JSON_FALSE;
     JsonNode *new = NULL;
 
-    new = jsonCreate(&new_literal, JSON_LITERAL);
-    assert(new != NULL);
-    assert(*(jsonReadLiteral(new)) == JSON_FALSE);
+    // Literal
+    {
+        new = jsonCreate(&JSON_FALSE, JSON_LITERAL);
+        assert(new != NULL);
+        assert(*(jsonReadLiteral(new)) == JSON_FALSE);
 
-    new = jsonCreatel(&new_literal, JSON_LITERAL, root, _INDEX(49));
-    assert(new != NULL);
-    assert(*(jsonReadLiteral(new)) == JSON_FALSE);
-    new = jsonReadl(root, _INDEX(49), NULL);
-    assert(new != NULL);
-    assert(*(jsonReadLiteral(new)) == JSON_FALSE);
+        new = jsonCreatel(&JSON_FALSE, JSON_LITERAL, root, _INDEX(49));
+        assert(new != NULL);
+        assert(*(jsonReadLiteral(new)) == JSON_FALSE);
+        new = jsonReadl(root, _INDEX(49), NULL);
+        assert(new != NULL);
+        assert(*(jsonReadLiteral(new)) == JSON_FALSE);
 
-    struct json_path_partial *path_object_array[] = { _INDEX(99), NULL };
-    new = jsonCreatev(&new_literal, JSON_LITERAL, root, path_object_array);
-    assert(new != NULL);
-    assert(*(jsonReadLiteral(new)) == JSON_FALSE);
-    new = jsonReadv(root, path_object_array);
-    assert(new != NULL);
-    assert(*(jsonReadLiteral(new)) == JSON_FALSE);
+        struct json_path_partial *path_object_array[] = { _INDEX(99), NULL };
+        new = jsonCreatev(&JSON_FALSE, JSON_LITERAL, root, path_object_array);
+        assert(new != NULL);
+        assert(*(jsonReadLiteral(new)) == JSON_FALSE);
+        new = jsonReadv(root, path_object_array);
+        assert(new != NULL);
+        assert(*(jsonReadLiteral(new)) == JSON_FALSE);
 
-    new = jsonCreatel(&new_literal, JSON_LITERAL, root, _INDEX(0), _KEY("addedl"));
-    assert(new != NULL);
-    assert(*(jsonReadLiteral(new)) == JSON_FALSE);
-    new = jsonReadl(root, _INDEX(0), _KEY("addedl"));
-    assert(new != NULL);
-    assert(*(jsonReadLiteral(new)) == JSON_FALSE);
+        new = jsonCreatel(&JSON_FALSE, JSON_LITERAL, root, _INDEX(0), _KEY("literal_addedl"));
+        assert(new != NULL);
+        assert(*(jsonReadLiteral(new)) == JSON_FALSE);
+        new = jsonReadl(root, _INDEX(0), _KEY("literal_addedl"));
+        assert(new != NULL);
+        assert(*(jsonReadLiteral(new)) == JSON_FALSE);
 
-    struct json_path_partial *path_object_object[] = { _INDEX(0), _KEY("addedv"), NULL };
-    new = jsonCreatev(&new_literal, JSON_LITERAL, root, path_object_object);
-    assert(new != NULL);
-    assert(*(jsonReadLiteral(new)) == JSON_FALSE);
-    new = jsonReadv(root, path_object_object);
-    assert(new != NULL);
-    assert(*(jsonReadLiteral(new)) == JSON_FALSE);
+        struct json_path_partial *path_object_object[] = { _INDEX(0), _KEY("literal_addedv"), NULL };
+        new = jsonCreatev(&JSON_FALSE, JSON_LITERAL, root, path_object_object);
+        assert(new != NULL);
+        assert(*(jsonReadLiteral(new)) == JSON_FALSE);
+        new = jsonReadv(root, path_object_object);
+        assert(new != NULL);
+        assert(*(jsonReadLiteral(new)) == JSON_FALSE);
+    }
+
+    // Nums
+    {
+        double val;
+
+        val = 3.0;
+        new = jsonCreate(&val, JSON_NUM);
+        assert(new != NULL);
+        assert(*(jsonReadDouble(new)) == val);
+
+        val = 4.0;
+        new = jsonCreatel(&val, JSON_NUM, root, _INDEX(149));
+        assert(new != NULL);
+        assert(*(jsonReadDouble(new)) == val);
+        new = jsonReadl(root, _INDEX(149), NULL);
+        assert(new != NULL);
+        assert(*(jsonReadDouble(new)) == val);
+
+        val = 5.0;
+        struct json_path_partial *path_object_array[] = { _INDEX(199), NULL };
+        new = jsonCreatev(&val, JSON_NUM, root, path_object_array);
+        assert(new != NULL);
+        assert(*(jsonReadDouble(new)) == val);
+        new = jsonReadv(root, path_object_array);
+        assert(new != NULL);
+        assert(*(jsonReadDouble(new)) == val);
+
+        val = 6.0;
+        new = jsonCreatel(&val, JSON_NUM, root, _INDEX(0), _KEY("num_addedl"));
+        assert(new != NULL);
+        assert(*(jsonReadDouble(new)) == val);
+        new = jsonReadl(root, _INDEX(0), _KEY("num_addedl"));
+        assert(new != NULL);
+        assert(*(jsonReadDouble(new)) == val);
+
+        val = 7.0;
+        struct json_path_partial *path_object_object[] = { _INDEX(0), _KEY("num_addedv"), NULL };
+        new = jsonCreatev(&val, JSON_NUM, root, path_object_object);
+        assert(new != NULL);
+        assert(*(jsonReadDouble(new)) == val);
+        new = jsonReadv(root, path_object_object);
+        assert(new != NULL);
+        assert(*(jsonReadDouble(new)) == val);
+    }
+
+    // Strings
+    {
+        char *str;
+
+        str = "OK FIRST STRING!";
+        new = jsonCreate(str, JSON_STR);
+        assert(new != NULL);
+        assert(strcmp(str, jsonReadStr(new)) == 0);
+
+        str = "NOW SECOND STRING!";
+        new = jsonCreatel(str, JSON_STR, root, _INDEX(249));
+        assert(new != NULL);
+        assert(strcmp(str, jsonReadStr(new)) == 0);
+        new = jsonReadl(root, _INDEX(249), NULL);
+        assert(new != NULL);
+        assert(strcmp(str, jsonReadStr(new)) == 0);
+
+        str = "TIME FOR THE THIRD";
+        struct json_path_partial *path_object_array[] = { _INDEX(299), NULL };
+        new = jsonCreatev(str, JSON_STR, root, path_object_array);
+        assert(new != NULL);
+        assert(strcmp(str, jsonReadStr(new)) == 0);
+        new = jsonReadv(root, path_object_array);
+        assert(new != NULL);
+        assert(strcmp(str, jsonReadStr(new)) == 0);
+
+        str = "OK OK THE 4th";
+        new = jsonCreatel(str, JSON_STR, root, _INDEX(0), _KEY("str_addedl"));
+        assert(new != NULL);
+        assert(strcmp(str, jsonReadStr(new)) == 0);
+        new = jsonReadl(root, _INDEX(0), _KEY("str_addedl"));
+        assert(new != NULL);
+        assert(strcmp(str, jsonReadStr(new)) == 0);
+
+        str = "AND THE LAST!";
+        struct json_path_partial *path_object_object[] = { _INDEX(0), _KEY("str_addedv"), NULL };
+        new = jsonCreatev(str, JSON_STR, root, path_object_object);
+        assert(new != NULL);
+        assert(strcmp(str, jsonReadStr(new)) == 0);
+        new = jsonReadv(root, path_object_object);
+        assert(new != NULL);
+        assert(strcmp(str, jsonReadStr(new)) == 0);
+    }
+
+    // Arrays
+    {
+        {
+            new = jsonCreatel(NULL, JSON_ARRAY, root, _INDEX(349));
+            assert(new != NULL);
+
+            new = jsonCreatel(&JSON_TRUE, JSON_LITERAL, root, _INDEX(349), _INDEX(0));
+            assert(new != NULL);
+            assert(jsonReadLiteral(new) != NULL);
+            assert(*jsonReadLiteral(new) == JSON_TRUE);
+
+            double three = 3.0;
+            new = jsonCreatel(&three, JSON_NUM, root, _INDEX(349), _INDEX(2));
+            assert(new != NULL);
+            assert(jsonReadDouble(new) != NULL);
+            assert(*jsonReadDouble(new) == three);
+
+            char *four = "This is not the the the the number 4 (:";
+            new = jsonCreatel(four, JSON_STR, root, _INDEX(349), _INDEX(1));
+            assert(new != NULL);
+            assert(jsonReadStr(new) != NULL);
+            assert(strcmp(four, jsonReadStr(new)) == 0);
+
+            new = jsonCreatel(NULL, JSON_ARRAY, root, _INDEX(349), _INDEX(4));
+            assert(new != NULL);
+            char *awesome = "This means nested arrays are working!";
+            new = jsonCreatel(awesome, JSON_STR, root, _INDEX(349), _INDEX(4), _INDEX(3));
+            assert(new != NULL);
+            assert(jsonReadStr(new) != NULL);
+            assert(strcmp(awesome, jsonReadStr(new)) == 0);
+
+            new = jsonCreatel(NULL, JSON_OBJECT, root, _INDEX(349), _INDEX(5));
+            assert(new != NULL);
+            char *awesome2 = "This means nested objects are working!";
+            new = jsonCreatel(awesome2, JSON_STR, root, _INDEX(349), _INDEX(5), _KEY("3 is key"));
+            assert(new != NULL);
+            assert(jsonReadStr(new) != NULL);
+            assert(strcmp(awesome2, jsonReadStr(new)) == 0);
+        }
+
+        {
+            struct json_path_partial *path_initial[] = { _INDEX(399), NULL };
+            new = jsonCreatev(NULL, JSON_ARRAY, root, path_initial);
+            assert(new != NULL);
+
+            struct json_path_partial *path_a[] = { _INDEX(399), _INDEX(0), NULL };
+            new = jsonCreatev(&JSON_TRUE, JSON_LITERAL, root, path_a);
+            assert(new != NULL);
+            assert(jsonReadLiteral(new) != NULL);
+            assert(*jsonReadLiteral(new) == JSON_TRUE);
+
+            struct json_path_partial *path_b[] = { _INDEX(399), _INDEX(2), NULL };
+            double three = 3.0;
+            new = jsonCreatev(&three, JSON_NUM, root, path_b);
+            assert(new != NULL);
+            assert(jsonReadDouble(new) != NULL);
+            assert(*jsonReadDouble(new) == three);
+
+            struct json_path_partial *path_c[] = { _INDEX(399), _INDEX(1), NULL };
+            char *four = "This is not the the the the number 4 (:";
+            new = jsonCreatev(four, JSON_STR, root, path_c);
+            assert(new != NULL);
+            assert(jsonReadStr(new) != NULL);
+            assert(strcmp(four, jsonReadStr(new)) == 0);
+
+            struct json_path_partial *path_d[] = { _INDEX(399), _INDEX(4), NULL };
+            new = jsonCreatev(NULL, JSON_ARRAY, root, path_d);
+            assert(new != NULL);
+            struct json_path_partial *path_e[] = { _INDEX(399), _INDEX(4), _INDEX(3), NULL };
+            char *awesome = "This means nested arrays are working!";
+            new = jsonCreatev(awesome, JSON_STR, root, path_e);
+            assert(new != NULL);
+            assert(jsonReadStr(new) != NULL);
+            assert(strcmp(awesome, jsonReadStr(new)) == 0);
+
+            struct json_path_partial *path_f[] = { _INDEX(399), _INDEX(6), NULL };
+            new = jsonCreatev(NULL, JSON_OBJECT, root, path_f);
+            assert(new != NULL);
+            struct json_path_partial *path_g[] = { _INDEX(399), _INDEX(6), _KEY("Checking keys again"), NULL };
+            char *awesome2 = "This means nested objects are working!";
+            new = jsonCreatev(awesome2, JSON_STR, root, path_g);
+            assert(new != NULL);
+            assert(jsonReadStr(new) != NULL);
+            assert(strcmp(awesome2, jsonReadStr(new)) == 0);
+        }
+    }
+
+    // Objects
+    {
+        {
+            new = jsonCreatel(NULL, JSON_OBJECT, root, _INDEX(449));
+            assert(new != NULL);
+
+            new = jsonCreatel(&JSON_TRUE, JSON_LITERAL, root, _INDEX(449), _KEY("0 is the index"));
+            assert(new != NULL);
+            assert(jsonReadLiteral(new) != NULL);
+            assert(*jsonReadLiteral(new) == JSON_TRUE);
+
+            double three = 3.0;
+            new = jsonCreatel(&three, JSON_NUM, root, _INDEX(449), _KEY("2 is a key not an index"));
+            assert(new != NULL);
+            assert(jsonReadDouble(new) != NULL);
+            assert(*jsonReadDouble(new) == three);
+
+            char *four = "This is not the the the the number 4 (:";
+            new = jsonCreatel(four, JSON_STR, root, _INDEX(449), _KEY("111111111111111111111"));
+            assert(new != NULL);
+            assert(jsonReadStr(new) != NULL);
+            assert(strcmp(four, jsonReadStr(new)) == 0);
+
+            new = jsonCreatel(NULL, JSON_OBJECT, root, _INDEX(449), _KEY("4 just 4"));
+            assert(new != NULL);
+            char *awesome = "This means nested arrays are working!";
+            new = jsonCreatel(awesome, JSON_STR, root, _INDEX(449), _KEY("4 just 4"), _KEY("working"));
+            assert(new != NULL);
+            assert(jsonReadStr(new) != NULL);
+            assert(strcmp(awesome, jsonReadStr(new)) == 0);
+
+            // just to make sure empty objects work fine
+            new = jsonCreatel(NULL, JSON_OBJECT, root, _INDEX(449), _KEY("4 just 4"), _KEY("empty"));
+            assert(new != NULL);
+        }
+
+        {
+            struct json_path_partial *path_initial[] = { _INDEX(499), NULL };
+            new = jsonCreatev(NULL, JSON_OBJECT, root, path_initial);
+            assert(new != NULL);
+
+            struct json_path_partial *path_a[] = { _INDEX(499), _KEY("Almost done with these tests!"), NULL };
+            new = jsonCreatev(&JSON_TRUE, JSON_LITERAL, root, path_a);
+            assert(new != NULL);
+            assert(jsonReadLiteral(new) != NULL);
+            assert(*jsonReadLiteral(new) == JSON_TRUE);
+
+            struct json_path_partial *path_b[] = { _INDEX(499), _KEY("Then comes reorganizing more stuff"), NULL };
+            double three = 3.0;
+            new = jsonCreatev(&three, JSON_NUM, root, path_b);
+            assert(new != NULL);
+            assert(jsonReadDouble(new) != NULL);
+            assert(*jsonReadDouble(new) == three);
+
+            struct json_path_partial *path_c[] = { _INDEX(499), _KEY("celebrating"), NULL };
+            char *four = "This is not the the the the number 4 (:";
+            new = jsonCreatev(four, JSON_STR, root, path_c);
+            assert(new != NULL);
+            assert(jsonReadStr(new) != NULL);
+            assert(strcmp(four, jsonReadStr(new)) == 0);
+
+            struct json_path_partial *path_d[] = { _INDEX(499), _KEY("It's too easy"), NULL };
+            new = jsonCreatev(NULL, JSON_OBJECT, root, path_d);
+            assert(new != NULL);
+            struct json_path_partial *path_e[] = { _INDEX(499), _KEY("It's too easy"), _KEY("And it's done"), NULL };
+            char *awesome = "This means nested objects are working!";
+            new = jsonCreatev(awesome, JSON_STR, root, path_e);
+            assert(new != NULL);
+            assert(jsonReadStr(new) != NULL);
+            assert(strcmp(awesome, jsonReadStr(new)) == 0);
+        }
+    }
 
     FILE *debug_out = fopen("./tmp/jsonCreate.debug.json", "w");
     assert(debug_out != NULL);
