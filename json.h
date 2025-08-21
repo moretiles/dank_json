@@ -25,6 +25,16 @@
 #include "pool.c"
 #endif
 
+/*
+ *  * Possible values for literal
+ *   */
+#define _JSON_TRUE (0)
+jsonLiteral JSON_TRUE = _JSON_TRUE;
+#define _JSON_FALSE (1)
+jsonLiteral JSON_FALSE = _JSON_FALSE;
+#define _JSON_NULL (2)
+jsonLiteral JSON_NULL = _JSON_NULL;
+
 int jsonLibInit();
 JsonNode *jsonOpen(const char *fileName);
 void jsonClose(const char *fileName);

@@ -2,6 +2,8 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+#ifndef JSON_STRUCTS
+#define JSON_STRUCTS 1
 /*
  * json node flags
  * The four leading bits are used to store flags relevent across all json_node
@@ -16,10 +18,6 @@
 #define JSON_NUM_IS_INT (1 << 2)
 #define JSON_NUM_IS_SCIENTIFIC (1 << 1)
 #define JSON_NUM_IS_NUM (1 << 0)
-
-// #define FNV_PRIME (pow(2, 40) + pow(2, 8) + 0x3b)
-#define FNV_PRIME (1099511628091)
-#define FNV_OFFSET_BASIS (14695981039346656037)
 
 /*
  * Possible type values
@@ -40,15 +38,6 @@ typedef uint8_t jsonType;
 typedef uint8_t jsonFlags;
 typedef uint8_t jsonLiteral;
 
-/*
- * Possible values for literal
- */
-#define JSON_TRUE (0)
-#define JSON_FALSE (1)
-#define JSON_NULL (2)
-
-#ifndef JSON_STRUCTS
-#define JSON_STRUCTS 1
 /*
  * union so we can store all possible types of json values
  * l, d, s, a, and o are for holding actual json types
