@@ -92,11 +92,6 @@ int array_destroy_node(struct json_pool *pool, JsonNode *array, JsonNode *elem) 
         return 1;
     }
 
-    if(elem->prev != NULL && elem->prev == elem->next) {
-        elem->prev = NULL;
-        elem->next = NULL;
-    }
-
     if (elem->prev && elem->next) {
         prev = elem->prev;
         next = elem->next;
@@ -110,7 +105,21 @@ int array_destroy_node(struct json_pool *pool, JsonNode *array, JsonNode *elem) 
             prev->flags |= JSON_ELEM_IS_HEAD;
         }
         next->prev = prev;
+    } else {
+        array->contents.a = NULL;
     }
+
+    // special condition for when the length before deletion was 2
+    if(elem->prev != NULL && elem->next != NULL && elem->prev == elem->next) {
+        if(elem->prev != NULL) {
+            elem->prev->prev = NULL;
+        }
+
+        if(elem->next != NULL) {
+            elem->next->next = NULL;
+        }
+    }
+
     elem->prev = NULL;
     elem->next = NULL;
 
@@ -123,7 +132,9 @@ int array_destroy(struct json_pool *pool, JsonNode *array) {
         return 1;
     }
 
-    while(array_destroy_node(pool, array, array_get_nth(array, 0)));
+    while(array->contents.a != NULL) {
+        array_destroy_node(pool, array, array_get_nth(array, 0));
+    }
 
     return 0;
 }
