@@ -1,25 +1,5 @@
 #include "jsonpath.h"
 
-struct json_path_partial jsonPathIndex(size_t index) {
-    struct json_path_partial ret = { 0 };
-
-    ret.prev = 0;
-    ret.path.index = index;
-    ret.type = JSON_ARRAY;
-
-    return ret;
-}
-
-struct json_path_partial jsonPathKey(char *src) {
-    struct json_path_partial ret = { 0 };
-
-    ret.prev = 0;
-    ret.path.key = src;
-    ret.type = JSON_OBJECT;
-
-    return ret;
-}
-
 struct json_path_partial *copy_json_path_partial(struct json_path_partial *src) {
     if(src == NULL) {
         return NULL;
@@ -129,7 +109,6 @@ int jsonPathPop(JsonPath *path) {
 
     if(path->tail != NULL) {
         struct json_path_partial *prev_tail = path->tail;
-        delete_json_path_partial(prev_tail);
 
         if(path->tail != path->head) {
             path->tail = prev_tail->prev;
@@ -137,7 +116,9 @@ int jsonPathPop(JsonPath *path) {
             path->head = prev_tail->prev;
             path->tail = prev_tail->prev;
         }
+
         path->members -= 1;
+        delete_json_path_partial(prev_tail);
     } else {
         path->tail = NULL;
         path->members = 0;

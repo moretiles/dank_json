@@ -452,6 +452,8 @@ JsonNode *jsonUpdate(void *src, char type, JsonNode *root) {
     int mask = 0xf0;
     char *newStr = NULL;
 
+    destroy_node_contents(root);
+
     switch (type) {
     case JSON_STR:
         newStr = calloc(strlen(src) + 1, sizeof(char));
@@ -736,6 +738,21 @@ JsonNode *destroy_node(struct json_pool *pool, JsonNode *elem) {
         return NULL;
     }
 
+    destroy_node_contents(elem);
+
+    elem->contents.n = pool->next_free;
+    elem->type = META_FREE;
+    elem->flags = 0;
+    pool->next_free = elem;
+    return elem;
+}
+
+JsonNode *destroy_node_contents(JsonNode *elem) {
+    jsonFlags mask = 0xf0;
+    if (!elem || elem->type == META_FREE) {
+        return NULL;
+    }
+
     if (elem->type == JSON_STR && elem->contents.s != NULL) {
         free(elem->contents.s);
         elem->contents.s = NULL;
@@ -748,10 +765,9 @@ JsonNode *destroy_node(struct json_pool *pool, JsonNode *elem) {
         // json_object_free(elem->contents.o);
     }
 
-    elem->contents.n = pool->next_free;
-    elem->type = META_FREE;
-    elem->flags = 0;
-    pool->next_free = elem;
+    elem->contents.l = JSON_NULL;
+    elem->type = JSON_LITERAL;
+    elem->flags &= mask;
     return elem;
 }
 
@@ -1093,6 +1109,8 @@ JsonNode *copy_json_node(JsonNode *dest, JsonNode *src) {
     if (dest == NULL || src == NULL) {
         return NULL;
     }
+
+    destroy_node_contents(dest);
 
     switch (src->type) {
     case JSON_LITERAL:
@@ -1571,12 +1589,12 @@ void jsonRead_tests() {
     // Check string
     {
         char *my_str = NULL;
-        JsonNode *exists = jsonReadl(object, _KEY("D"), _INDEX(2), NULL);
+        JsonNode *exists = jsonReadl(object, jsonPathKey("D"), jsonPathIndex(2), NULL);
         assert(exists != NULL);
-        //struct json_path_partial *exists_path[] = {_KEY("D"), _INDEX(2), NULL};
+        //struct json_path_partial *exists_path[] = {jsonPathKey("D"), jsonPathIndex(2), NULL};
         //JsonNode *exists2 = jsonReadv(object, exists_path);
         //assert(exists2 != NULL);
-        JsonPath *exists_json_path = jsonPathPush(NULL, _KEY("D"), _INDEX(2), NULL);
+        JsonPath *exists_json_path = jsonPathPush(NULL, jsonPathKey("D"), jsonPathIndex(2), NULL);
         JsonNode *exists3 = jsonReads(object, exists_json_path);
         assert(exists3 != NULL);
 
@@ -1587,7 +1605,7 @@ void jsonRead_tests() {
         assert(my_str != NULL);
         assert(!strcmp(my_str, "yes"));
 
-        my_str = jsonReadStrl(object, _KEY("D"), _INDEX(2), NULL);
+        my_str = jsonReadStrl(object, jsonPathKey("D"), jsonPathIndex(2), NULL);
         assert(my_str != NULL);
         assert(!strcmp(my_str, "yes"));
         my_str = jsonReadStrs(object, exists_json_path);
@@ -1605,16 +1623,16 @@ void jsonRead_tests() {
     {
         jsonType *read_literal = NULL;
 
-        read_literal = jsonReadLiterall(object, _KEY("E"));
+        read_literal = jsonReadLiterall(object, jsonPathKey("E"));
         assert(read_literal != NULL);
         assert(*read_literal == JSON_FALSE);
 
-        JsonPath *read_literal_path = jsonPathPush(NULL, _KEY("E"), NULL);
+        JsonPath *read_literal_path = jsonPathPush(NULL, jsonPathKey("E"), NULL);
         read_literal = jsonReadLiterals(object, read_literal_path);
         assert(read_literal != NULL);
         assert(*read_literal == JSON_FALSE);
 
-        JsonPath *read_literal_json_path = jsonPathPush(NULL, _KEY("E"), NULL );
+        JsonPath *read_literal_json_path = jsonPathPush(NULL, jsonPathKey("E"), NULL );
         read_literal = jsonReadLiterals(object, read_literal_json_path);
         assert(read_literal != NULL);
         assert(*read_literal == JSON_FALSE);
@@ -1624,16 +1642,16 @@ void jsonRead_tests() {
     {
         double *read_double = NULL;
 
-        read_double = jsonReadDoublel(object, _KEY("D"), _INDEX(0), _KEY("A"));
+        read_double = jsonReadDoublel(object, jsonPathKey("D"), jsonPathIndex(0), jsonPathKey("A"));
         assert(read_double != NULL);
         assert(*read_double == 10.0);
 
-        JsonPath *read_double_path = jsonPathPush(NULL, _KEY("D"), _INDEX(0), _KEY("A"), NULL);
+        JsonPath *read_double_path = jsonPathPush(NULL, jsonPathKey("D"), jsonPathIndex(0), jsonPathKey("A"), NULL);
         read_double = jsonReadDoubles(object, read_double_path);
         assert(read_double != NULL);
         assert(*read_double == 10.0);
 
-        JsonPath *read_double_json_path = jsonPathPush(NULL, _KEY("D"), _INDEX(0), _KEY("A"));
+        JsonPath *read_double_json_path = jsonPathPush(NULL, jsonPathKey("D"), jsonPathIndex(0), jsonPathKey("A"));
         read_double = jsonReadDoubles(object, read_double_json_path);
         assert(read_double != NULL);
         assert(*read_double == 10.0);
@@ -1643,23 +1661,23 @@ void jsonRead_tests() {
     {
         JsonNode *read_array = NULL;
 
-        read_array = jsonReadArrayl(object, _KEY("D"));
+        read_array = jsonReadArrayl(object, jsonPathKey("D"));
         assert(read_array != NULL);
-        double *read_double = jsonReadDoublel(read_array, _INDEX(1));
+        double *read_double = jsonReadDoublel(read_array, jsonPathIndex(1));
         assert(read_double != NULL);
         assert(*read_double == 1.0);
 
-        JsonPath *read_array_path = jsonPathPush(NULL, _KEY("D"), NULL);
+        JsonPath *read_array_path = jsonPathPush(NULL, jsonPathKey("D"), NULL);
         read_array = jsonReadArrays(object, read_array_path);
         assert(read_array != NULL);
-        read_double = jsonReadDoublel(read_array, _INDEX(1));
+        read_double = jsonReadDoublel(read_array, jsonPathIndex(1));
         assert(read_double != NULL);
         assert(*read_double == 1.0);
 
-        JsonPath *read_array_json_path = jsonPathPush(NULL, _KEY("D"), NULL );
+        JsonPath *read_array_json_path = jsonPathPush(NULL, jsonPathKey("D"), NULL );
         read_array = jsonReadArrays(object, read_array_json_path);
         assert(read_array != NULL);
-        read_array_json_path = jsonPathPush(read_array_json_path, _INDEX(1));
+        read_array_json_path = jsonPathPush(read_array_json_path, jsonPathIndex(1));
         read_double = jsonReadDoubles(object, read_array_json_path);
         assert(read_double != NULL);
         assert(*read_double == 1.0);
@@ -1670,20 +1688,20 @@ void jsonRead_tests() {
         JsonNode *read_object = NULL;
         double *read_double = NULL;
 
-        read_object = jsonReadObjectl(object, _KEY("D"), _INDEX(0));
+        read_object = jsonReadObjectl(object, jsonPathKey("D"), jsonPathIndex(0));
         assert(read_object != NULL);
-        read_double = jsonReadDoublel(read_object, _KEY("B"));
+        read_double = jsonReadDoublel(read_object, jsonPathKey("B"));
         assert(read_double != NULL);
         assert(*read_double == 11.0);
 
-        JsonPath *read_object_path = jsonPathPush(NULL, _KEY("D"), _INDEX(0), NULL);
+        JsonPath *read_object_path = jsonPathPush(NULL, jsonPathKey("D"), jsonPathIndex(0), NULL);
         read_object = jsonReadObjects(object, read_object_path);
         assert(read_object != NULL);
-        read_double = jsonReadDoublel(read_object, _KEY("B"));
+        read_double = jsonReadDoublel(read_object, jsonPathKey("B"));
         assert(read_double != NULL);
         assert(*read_double == 11.0);
 
-        JsonPath *read_object_json_path = jsonPathPush(NULL, _KEY("D"), _INDEX(0), NULL);
+        JsonPath *read_object_json_path = jsonPathPush(NULL, jsonPathKey("D"), jsonPathIndex(0), NULL);
         read_object = jsonReadObjects(object, read_object_json_path);
         assert(read_object != NULL);
         jsonPathPop(read_object_json_path);
@@ -1691,12 +1709,12 @@ void jsonRead_tests() {
         jsonPathPop(read_object_json_path);
         jsonPathPop(read_object_json_path);
         jsonPathPop(read_object_json_path);
-        read_object_json_path = jsonPathPush(read_object_json_path, _KEY("B"));
+        read_object_json_path = jsonPathPush(read_object_json_path, jsonPathKey("B"));
         read_double = jsonReadDoubles(read_object, read_object_json_path);
         assert(read_double != NULL);
         assert(*read_double == 11.0);
         jsonPathDelete(read_object_json_path);
-        read_object_json_path = jsonPathPush(NULL, _KEY("D"), _INDEX(0), _KEY("B"));
+        read_object_json_path = jsonPathPush(NULL, jsonPathKey("D"), jsonPathIndex(0), jsonPathKey("B"));
         read_double = jsonReadDoubles(object, read_object_json_path);
         assert(read_double != NULL);
         assert(*read_double == 11.0);
@@ -1731,9 +1749,9 @@ void output_tests() {
     // printf("%s\n", expected);
     // printf("%s\n", test);
     assert(!strcmp(expected, test));
-    assert(jsonOutl(stdin, 1, root, _KEY("D"), _INDEX(0), _KEY("B"), NULL) ==
+    assert(jsonOutl(stdin, 1, root, jsonPathKey("D"), jsonPathIndex(0), jsonPathKey("B"), NULL) ==
            0);
-    JsonPath *path = jsonPathPush(NULL, _KEY("D"), _INDEX(0), _KEY("B"), NULL);
+    JsonPath *path = jsonPathPush(NULL, jsonPathKey("D"), jsonPathIndex(0), jsonPathKey("B"), NULL);
     assert(jsonOuts(stdin, 1, root, path) == 0);
     fflush(out);
     fclose(out);
@@ -1754,14 +1772,14 @@ void jsonCreate_tests() {
         assert(new != NULL);
         assert(*(jsonReadLiteral(new)) == JSON_FALSE);
 
-        new = jsonCreatel(&JSON_FALSE, JSON_LITERAL, root, _INDEX(49));
+        new = jsonCreatel(&JSON_FALSE, JSON_LITERAL, root, jsonPathIndex(49));
         assert(new != NULL);
         assert(*(jsonReadLiteral(new)) == JSON_FALSE);
-        new = jsonReadl(root, _INDEX(49), NULL);
+        new = jsonReadl(root, jsonPathIndex(49), NULL);
         assert(new != NULL);
         assert(*(jsonReadLiteral(new)) == JSON_FALSE);
 
-        JsonPath *path_object_array = jsonPathPush(NULL, _INDEX(99), NULL);
+        JsonPath *path_object_array = jsonPathPush(NULL, jsonPathIndex(99), NULL);
         new = jsonCreates(&JSON_FALSE, JSON_LITERAL, root, path_object_array);
         assert(new != NULL);
         assert(*(jsonReadLiteral(new)) == JSON_FALSE);
@@ -1769,14 +1787,14 @@ void jsonCreate_tests() {
         assert(new != NULL);
         assert(*(jsonReadLiteral(new)) == JSON_FALSE);
 
-        new = jsonCreatel(&JSON_FALSE, JSON_LITERAL, root, _INDEX(0), _KEY("literal_addedl"));
+        new = jsonCreatel(&JSON_FALSE, JSON_LITERAL, root, jsonPathIndex(0), jsonPathKey("literal_addedl"));
         assert(new != NULL);
         assert(*(jsonReadLiteral(new)) == JSON_FALSE);
-        new = jsonReadl(root, _INDEX(0), _KEY("literal_addedl"));
+        new = jsonReadl(root, jsonPathIndex(0), jsonPathKey("literal_addedl"));
         assert(new != NULL);
         assert(*(jsonReadLiteral(new)) == JSON_FALSE);
 
-        JsonPath *path_object_object = jsonPathPush(NULL, _INDEX(0), _KEY("literal_addedv"), NULL);
+        JsonPath *path_object_object = jsonPathPush(NULL, jsonPathIndex(0), jsonPathKey("literal_addedv"), NULL);
         new = jsonCreates(&JSON_FALSE, JSON_LITERAL, root, path_object_object);
         assert(new != NULL);
         assert(*(jsonReadLiteral(new)) == JSON_FALSE);
@@ -1795,15 +1813,15 @@ void jsonCreate_tests() {
         assert(*(jsonReadDouble(new)) == val);
 
         val = 4.0;
-        new = jsonCreatel(&val, JSON_NUM, root, _INDEX(149));
+        new = jsonCreatel(&val, JSON_NUM, root, jsonPathIndex(149));
         assert(new != NULL);
         assert(*(jsonReadDouble(new)) == val);
-        new = jsonReadl(root, _INDEX(149), NULL);
+        new = jsonReadl(root, jsonPathIndex(149), NULL);
         assert(new != NULL);
         assert(*(jsonReadDouble(new)) == val);
 
         val = 5.0;
-        JsonPath *path_object_array = jsonPathPush(NULL, _INDEX(199), NULL);
+        JsonPath *path_object_array = jsonPathPush(NULL, jsonPathIndex(199), NULL);
         new = jsonCreates(&val, JSON_NUM, root, path_object_array);
         assert(new != NULL);
         assert(*(jsonReadDouble(new)) == val);
@@ -1812,15 +1830,15 @@ void jsonCreate_tests() {
         assert(*(jsonReadDouble(new)) == val);
 
         val = 6.0;
-        new = jsonCreatel(&val, JSON_NUM, root, _INDEX(0), _KEY("num_addedl"));
+        new = jsonCreatel(&val, JSON_NUM, root, jsonPathIndex(0), jsonPathKey("num_addedl"));
         assert(new != NULL);
         assert(*(jsonReadDouble(new)) == val);
-        new = jsonReadl(root, _INDEX(0), _KEY("num_addedl"));
+        new = jsonReadl(root, jsonPathIndex(0), jsonPathKey("num_addedl"));
         assert(new != NULL);
         assert(*(jsonReadDouble(new)) == val);
 
         val = 7.0;
-        JsonPath *path_object_object = jsonPathPush(NULL, _INDEX(0), _KEY("num_addedv"), NULL);
+        JsonPath *path_object_object = jsonPathPush(NULL, jsonPathIndex(0), jsonPathKey("num_addedv"), NULL);
         new = jsonCreates(&val, JSON_NUM, root, path_object_object);
         assert(new != NULL);
         assert(*(jsonReadDouble(new)) == val);
@@ -1839,15 +1857,15 @@ void jsonCreate_tests() {
         assert(strcmp(str, jsonReadStr(new)) == 0);
 
         str = "NOW SECOND STRING!";
-        new = jsonCreatel(str, JSON_STR, root, _INDEX(249));
+        new = jsonCreatel(str, JSON_STR, root, jsonPathIndex(249));
         assert(new != NULL);
         assert(strcmp(str, jsonReadStr(new)) == 0);
-        new = jsonReadl(root, _INDEX(249), NULL);
+        new = jsonReadl(root, jsonPathIndex(249), NULL);
         assert(new != NULL);
         assert(strcmp(str, jsonReadStr(new)) == 0);
 
         str = "TIME FOR THE THIRD";
-        JsonPath *path_object_array = jsonPathPush(NULL, _INDEX(299), NULL);
+        JsonPath *path_object_array = jsonPathPush(NULL, jsonPathIndex(299), NULL);
         new = jsonCreates(str, JSON_STR, root, path_object_array);
         assert(new != NULL);
         assert(strcmp(str, jsonReadStr(new)) == 0);
@@ -1856,15 +1874,15 @@ void jsonCreate_tests() {
         assert(strcmp(str, jsonReadStr(new)) == 0);
 
         str = "OK OK THE 4th";
-        new = jsonCreatel(str, JSON_STR, root, _INDEX(0), _KEY("str_addedl"));
+        new = jsonCreatel(str, JSON_STR, root, jsonPathIndex(0), jsonPathKey("str_addedl"));
         assert(new != NULL);
         assert(strcmp(str, jsonReadStr(new)) == 0);
-        new = jsonReadl(root, _INDEX(0), _KEY("str_addedl"));
+        new = jsonReadl(root, jsonPathIndex(0), jsonPathKey("str_addedl"));
         assert(new != NULL);
         assert(strcmp(str, jsonReadStr(new)) == 0);
 
         str = "AND THE LAST!";
-        JsonPath *path_object_object = jsonPathPush(NULL, _INDEX(0), _KEY("str_addedv"), NULL);
+        JsonPath *path_object_object = jsonPathPush(NULL, jsonPathIndex(0), jsonPathKey("str_addedv"), NULL);
         new = jsonCreates(str, JSON_STR, root, path_object_object);
         assert(new != NULL);
         assert(strcmp(str, jsonReadStr(new)) == 0);
@@ -1876,82 +1894,82 @@ void jsonCreate_tests() {
     // Arrays
     {
         {
-            new = jsonCreatel(NULL, JSON_ARRAY, root, _INDEX(349));
+            new = jsonCreatel(NULL, JSON_ARRAY, root, jsonPathIndex(349));
             assert(new != NULL);
 
-            new = jsonCreatel(&JSON_TRUE, JSON_LITERAL, root, _INDEX(349), _INDEX(0));
+            new = jsonCreatel(&JSON_TRUE, JSON_LITERAL, root, jsonPathIndex(349), jsonPathIndex(0));
             assert(new != NULL);
             assert(jsonReadLiteral(new) != NULL);
             assert(*jsonReadLiteral(new) == JSON_TRUE);
 
             double three = 3.0;
-            new = jsonCreatel(&three, JSON_NUM, root, _INDEX(349), _INDEX(2));
+            new = jsonCreatel(&three, JSON_NUM, root, jsonPathIndex(349), jsonPathIndex(2));
             assert(new != NULL);
             assert(jsonReadDouble(new) != NULL);
             assert(*jsonReadDouble(new) == three);
 
             char *four = "This is not the the the the number 4 (:";
-            new = jsonCreatel(four, JSON_STR, root, _INDEX(349), _INDEX(1));
+            new = jsonCreatel(four, JSON_STR, root, jsonPathIndex(349), jsonPathIndex(1));
             assert(new != NULL);
             assert(jsonReadStr(new) != NULL);
             assert(strcmp(four, jsonReadStr(new)) == 0);
 
-            new = jsonCreatel(NULL, JSON_ARRAY, root, _INDEX(349), _INDEX(4));
+            new = jsonCreatel(NULL, JSON_ARRAY, root, jsonPathIndex(349), jsonPathIndex(4));
             assert(new != NULL);
             char *awesome = "This means nested arrays are working!";
-            new = jsonCreatel(awesome, JSON_STR, root, _INDEX(349), _INDEX(4), _INDEX(3));
+            new = jsonCreatel(awesome, JSON_STR, root, jsonPathIndex(349), jsonPathIndex(4), jsonPathIndex(3));
             assert(new != NULL);
             assert(jsonReadStr(new) != NULL);
             assert(strcmp(awesome, jsonReadStr(new)) == 0);
 
-            new = jsonCreatel(NULL, JSON_OBJECT, root, _INDEX(349), _INDEX(5));
+            new = jsonCreatel(NULL, JSON_OBJECT, root, jsonPathIndex(349), jsonPathIndex(5));
             assert(new != NULL);
             char *awesome2 = "This means nested objects are working!";
-            new = jsonCreatel(awesome2, JSON_STR, root, _INDEX(349), _INDEX(5), _KEY("3 is key"));
+            new = jsonCreatel(awesome2, JSON_STR, root, jsonPathIndex(349), jsonPathIndex(5), jsonPathKey("3 is key"));
             assert(new != NULL);
             assert(jsonReadStr(new) != NULL);
             assert(strcmp(awesome2, jsonReadStr(new)) == 0);
         }
 
         {
-            JsonPath *path_initial = jsonPathPush(NULL, _INDEX(399), NULL);
+            JsonPath *path_initial = jsonPathPush(NULL, jsonPathIndex(399), NULL);
             new = jsonCreates(NULL, JSON_ARRAY, root, path_initial);
             assert(new != NULL);
 
-            JsonPath *path_a = jsonPathPush(NULL, _INDEX(399), _INDEX(0), NULL);
+            JsonPath *path_a = jsonPathPush(NULL, jsonPathIndex(399), jsonPathIndex(0), NULL);
             new = jsonCreates(&JSON_TRUE, JSON_LITERAL, root, path_a);
             assert(new != NULL);
             assert(jsonReadLiteral(new) != NULL);
             assert(*jsonReadLiteral(new) == JSON_TRUE);
 
             double three = 3.0;
-            JsonPath *path_b = jsonPathPush(NULL, _INDEX(399), _INDEX(2), NULL);
+            JsonPath *path_b = jsonPathPush(NULL, jsonPathIndex(399), jsonPathIndex(2), NULL);
             new = jsonCreates(&three, JSON_NUM, root, path_b);
             assert(new != NULL);
             assert(jsonReadDouble(new) != NULL);
             assert(*jsonReadDouble(new) == three);
 
-            JsonPath *path_c = jsonPathPush(NULL, _INDEX(399), _INDEX(1), NULL);
+            JsonPath *path_c = jsonPathPush(NULL, jsonPathIndex(399), jsonPathIndex(1), NULL);
             char *four = "This is not the the the the number 4 (:";
             new = jsonCreates(four, JSON_STR, root, path_c);
             assert(new != NULL);
             assert(jsonReadStr(new) != NULL);
             assert(strcmp(four, jsonReadStr(new)) == 0);
 
-            JsonPath *path_d = jsonPathPush(NULL, _INDEX(399), _INDEX(4), NULL);
+            JsonPath *path_d = jsonPathPush(NULL, jsonPathIndex(399), jsonPathIndex(4), NULL);
             new = jsonCreates(NULL, JSON_ARRAY, root, path_d);
             assert(new != NULL);
-            JsonPath *path_e = jsonPathPush(NULL, _INDEX(399), _INDEX(4), _INDEX(3), NULL);
+            JsonPath *path_e = jsonPathPush(NULL, jsonPathIndex(399), jsonPathIndex(4), jsonPathIndex(3), NULL);
             char *awesome = "This means nested arrays are working!";
             new = jsonCreates(awesome, JSON_STR, root, path_e);
             assert(new != NULL);
             assert(jsonReadStr(new) != NULL);
             assert(strcmp(awesome, jsonReadStr(new)) == 0);
 
-            JsonPath *path_f = jsonPathPush(NULL, _INDEX(399), _INDEX(6), NULL);
+            JsonPath *path_f = jsonPathPush(NULL, jsonPathIndex(399), jsonPathIndex(6), NULL);
             new = jsonCreates(NULL, JSON_OBJECT, root, path_f);
             assert(new != NULL);
-            JsonPath *path_g = jsonPathPush(NULL, _INDEX(399), _INDEX(6), _KEY("Checking keys again"), NULL);
+            JsonPath *path_g = jsonPathPush(NULL, jsonPathIndex(399), jsonPathIndex(6), jsonPathKey("Checking keys again"), NULL);
             char *awesome2 = "This means nested objects are working!";
             new = jsonCreates(awesome2, JSON_STR, root, path_g);
             assert(new != NULL);
@@ -1963,68 +1981,68 @@ void jsonCreate_tests() {
     // Objects
     {
         {
-            new = jsonCreatel(NULL, JSON_OBJECT, root, _INDEX(449));
+            new = jsonCreatel(NULL, JSON_OBJECT, root, jsonPathIndex(449));
             assert(new != NULL);
 
-            new = jsonCreatel(&JSON_TRUE, JSON_LITERAL, root, _INDEX(449), _KEY("0 is the index"));
+            new = jsonCreatel(&JSON_TRUE, JSON_LITERAL, root, jsonPathIndex(449), jsonPathKey("0 is the index"));
             assert(new != NULL);
             assert(jsonReadLiteral(new) != NULL);
             assert(*jsonReadLiteral(new) == JSON_TRUE);
 
             double three = 3.0;
-            new = jsonCreatel(&three, JSON_NUM, root, _INDEX(449), _KEY("2 is a key not an index"));
+            new = jsonCreatel(&three, JSON_NUM, root, jsonPathIndex(449), jsonPathKey("2 is a key not an index"));
             assert(new != NULL);
             assert(jsonReadDouble(new) != NULL);
             assert(*jsonReadDouble(new) == three);
 
             char *four = "This is not the the the the number 4 (:";
-            new = jsonCreatel(four, JSON_STR, root, _INDEX(449), _KEY("111111111111111111111"));
+            new = jsonCreatel(four, JSON_STR, root, jsonPathIndex(449), jsonPathKey("111111111111111111111"));
             assert(new != NULL);
             assert(jsonReadStr(new) != NULL);
             assert(strcmp(four, jsonReadStr(new)) == 0);
 
-            new = jsonCreatel(NULL, JSON_OBJECT, root, _INDEX(449), _KEY("4 just 4"));
+            new = jsonCreatel(NULL, JSON_OBJECT, root, jsonPathIndex(449), jsonPathKey("4 just 4"));
             assert(new != NULL);
             char *awesome = "This means nested arrays are working!";
-            new = jsonCreatel(awesome, JSON_STR, root, _INDEX(449), _KEY("4 just 4"), _KEY("working"));
+            new = jsonCreatel(awesome, JSON_STR, root, jsonPathIndex(449), jsonPathKey("4 just 4"), jsonPathKey("working"));
             assert(new != NULL);
             assert(jsonReadStr(new) != NULL);
             assert(strcmp(awesome, jsonReadStr(new)) == 0);
 
             // just to make sure empty objects work fine
-            new = jsonCreatel(NULL, JSON_OBJECT, root, _INDEX(449), _KEY("4 just 4"), _KEY("empty"));
+            new = jsonCreatel(NULL, JSON_OBJECT, root, jsonPathIndex(449), jsonPathKey("4 just 4"), jsonPathKey("empty"));
             assert(new != NULL);
         }
 
         {
-            JsonPath *path_initial = jsonPathPush(NULL, _INDEX(499), NULL);
+            JsonPath *path_initial = jsonPathPush(NULL, jsonPathIndex(499), NULL);
             new = jsonCreates(NULL, JSON_OBJECT, root, path_initial);
             assert(new != NULL);
 
-            JsonPath *path_a = jsonPathPush(NULL, _INDEX(499), _KEY("Almost done with these tests!"), NULL);
+            JsonPath *path_a = jsonPathPush(NULL, jsonPathIndex(499), jsonPathKey("Almost done with these tests!"), NULL);
             new = jsonCreates(&JSON_TRUE, JSON_LITERAL, root, path_a);
             assert(new != NULL);
             assert(jsonReadLiteral(new) != NULL);
             assert(*jsonReadLiteral(new) == JSON_TRUE);
 
             double three = 3.0;
-            JsonPath *path_b = jsonPathPush(NULL, _INDEX(499), _KEY("Then comes reorganizing more stuff"), NULL);
+            JsonPath *path_b = jsonPathPush(NULL, jsonPathIndex(499), jsonPathKey("Then comes reorganizing more stuff"), NULL);
             new = jsonCreates(&three, JSON_NUM, root, path_b);
             assert(new != NULL);
             assert(jsonReadDouble(new) != NULL);
             assert(*jsonReadDouble(new) == three);
 
             char *four = "This is not the the the the number 4 (:";
-            JsonPath *path_c = jsonPathPush(NULL, _INDEX(499), _KEY("celebrating"), NULL);
+            JsonPath *path_c = jsonPathPush(NULL, jsonPathIndex(499), jsonPathKey("celebrating"), NULL);
             new = jsonCreates(four, JSON_STR, root, path_c);
             assert(new != NULL);
             assert(jsonReadStr(new) != NULL);
             assert(strcmp(four, jsonReadStr(new)) == 0);
 
-            JsonPath *path_d = jsonPathPush(NULL, _INDEX(499), _KEY("It's too easy"), NULL);
+            JsonPath *path_d = jsonPathPush(NULL, jsonPathIndex(499), jsonPathKey("It's too easy"), NULL);
             new = jsonCreates(NULL, JSON_OBJECT, root, path_d);
             assert(new != NULL);
-            JsonPath *path_e = jsonPathPush(NULL, _INDEX(499), _KEY("It's too easy"), _KEY("And it's done"), NULL);
+            JsonPath *path_e = jsonPathPush(NULL, jsonPathIndex(499), jsonPathKey("It's too easy"), jsonPathKey("And it's done"), NULL);
             char *awesome = "This means nested objects are working!";
             new = jsonCreates(awesome, JSON_STR, root, path_e);
             assert(new != NULL);
@@ -2052,18 +2070,18 @@ void jsonUpdate_tests() {
         jsonLiteral trueLiteral = JSON_TRUE;
         jsonLiteral falseLiteral = JSON_FALSE;
 
-        assert(jsonUpdatel(&trueLiteral, newType, root, _INDEX(4)));
-        new = jsonReadl(root, _INDEX(4));
+        assert(jsonUpdatel(&trueLiteral, newType, root, jsonPathIndex(4)));
+        new = jsonReadl(root, jsonPathIndex(4));
         assert(new != NULL);
-        assert(*(jsonReadLiterall(root, _INDEX(4))) == trueLiteral);
+        assert(*(jsonReadLiterall(root, jsonPathIndex(4))) == trueLiteral);
 
-        JsonPath *path_literal = jsonPathPush(NULL, _INDEX(2), NULL);
+        JsonPath *path_literal = jsonPathPush(NULL, jsonPathIndex(2), NULL);
         assert(jsonUpdates(&falseLiteral, newType, root, path_literal) != NULL);
         new = jsonReads(root, path_literal);
         assert(new != NULL);
         assert(*(jsonReadLiterals(root, path_literal)) == falseLiteral);
 
-        JsonPath *Path_literal = jsonPathPush(NULL, _INDEX(3));
+        JsonPath *Path_literal = jsonPathPush(NULL, jsonPathIndex(3));
         assert(jsonUpdates(&falseLiteral, newType, root, Path_literal) != NULL);
         new = jsonReads(root, Path_literal);
         assert(new != NULL);
@@ -2076,18 +2094,18 @@ void jsonUpdate_tests() {
         double jsonNum1 = 15.0;
         double jsonNum2 = 35.0;
 
-        assert(jsonUpdatel(&jsonNum1, newType, root, _INDEX(4)));
-        new = jsonReadl(root, _INDEX(4));
+        assert(jsonUpdatel(&jsonNum1, newType, root, jsonPathIndex(4)));
+        new = jsonReadl(root, jsonPathIndex(4));
         assert(new != NULL);
-        assert(*(jsonReadDoublel(root, _INDEX(4))) == jsonNum1);
+        assert(*(jsonReadDoublel(root, jsonPathIndex(4))) == jsonNum1);
 
-        JsonPath *path_literal = jsonPathPush(NULL, _INDEX(2), NULL);
+        JsonPath *path_literal = jsonPathPush(NULL, jsonPathIndex(2), NULL);
         assert(jsonUpdates(&jsonNum2, newType, root, path_literal) != NULL);
         new = jsonReads(root, path_literal);
         assert(new != NULL);
         assert(*(jsonReadDoubles(root, path_literal)) == jsonNum2);
 
-        JsonPath *Path_literal = jsonPathPush(NULL, _INDEX(3), NULL );
+        JsonPath *Path_literal = jsonPathPush(NULL, jsonPathIndex(3), NULL );
         assert(jsonUpdates(&jsonNum2, newType, root, Path_literal) != NULL);
         new = jsonReads(root, Path_literal);
         assert(new != NULL);
@@ -2101,20 +2119,20 @@ void jsonUpdate_tests() {
         char *jsonStr1 = "here is the first string!";
         char *jsonStr2 = "AND THIS IS THE SECOND!";
 
-        assert(jsonUpdatel(jsonStr1, newType, root, _INDEX(4)));
-        new = jsonReadl(root, _INDEX(4));
+        assert(jsonUpdatel(jsonStr1, newType, root, jsonPathIndex(4)));
+        new = jsonReadl(root, jsonPathIndex(4));
         assert(new != NULL);
-        tmpString = jsonReadStrl(root, _INDEX(4));
+        tmpString = jsonReadStrl(root, jsonPathIndex(4));
         assert(!strcmp(tmpString, jsonStr1));
 
-        JsonPath *path_literal = jsonPathPush(NULL, _INDEX(2), NULL);
+        JsonPath *path_literal = jsonPathPush(NULL, jsonPathIndex(2), NULL);
         assert(jsonUpdates(jsonStr2, newType, root, path_literal) != NULL);
         new = jsonReads(root, path_literal);
         assert(new != NULL);
         tmpString = jsonReadStrs(root, path_literal);
         assert(!strcmp(tmpString, jsonStr2));
 
-        JsonPath *Path_literal = jsonPathPush(NULL, _INDEX(3), NULL );
+        JsonPath *Path_literal = jsonPathPush(NULL, jsonPathIndex(3), NULL );
         assert(jsonUpdates(jsonStr2, newType, root, Path_literal) != NULL);
         new = jsonReads(root, Path_literal);
         assert(new != NULL);
@@ -2145,15 +2163,15 @@ void jsonCopy_tests() {
 
         // copy to array
         {
-            assert(jsonCopyl(trueNode, root, _INDEX(111)) != NULL);
-            new = jsonReadl(root, _INDEX(111));
+            assert(jsonCopyl(trueNode, root, jsonPathIndex(111)) != NULL);
+            new = jsonReadl(root, jsonPathIndex(111));
             assert(trueNode != NULL);
             assert(new != NULL);
             assert(trueNode != new);
             assert(*jsonReadLiteral(trueNode) == *jsonReadLiteral(new));
             assert(*jsonReadLiteral(falseNode) != *jsonReadLiteral(new));
 
-            JsonPath *array_pathv = jsonPathPush(NULL, _INDEX(112), NULL);
+            JsonPath *array_pathv = jsonPathPush(NULL, jsonPathIndex(112), NULL);
             assert(jsonCopys(trueNode, root, array_pathv) != NULL);
             new = jsonReads(root, array_pathv);
             assert(trueNode != NULL);
@@ -2162,7 +2180,7 @@ void jsonCopy_tests() {
             assert(*jsonReadLiteral(trueNode) == *jsonReadLiteral(new));
             assert(*jsonReadLiteral(falseNode) != *jsonReadLiteral(new));
 
-            JsonPath *array_Pathv = jsonPathPush(NULL, _INDEX(113), NULL );
+            JsonPath *array_Pathv = jsonPathPush(NULL, jsonPathIndex(113), NULL );
             assert(jsonCopys(trueNode, root, array_Pathv) != NULL);
             new = jsonReads(root, array_Pathv);
             assert(trueNode != NULL);
@@ -2174,15 +2192,15 @@ void jsonCopy_tests() {
 
         // copy to object
         {
-            assert(jsonCopyl(trueNode, root, _INDEX(5), _KEY("111")) != NULL);
-            new = jsonReadl(root, _INDEX(5), _KEY("111"));
+            assert(jsonCopyl(trueNode, root, jsonPathIndex(5), jsonPathKey("111")) != NULL);
+            new = jsonReadl(root, jsonPathIndex(5), jsonPathKey("111"));
             assert(trueNode != NULL);
             assert(new != NULL);
             assert(trueNode != new);
             assert(*jsonReadLiteral(trueNode) == *jsonReadLiteral(new));
             assert(*jsonReadLiteral(falseNode) != *jsonReadLiteral(new));
 
-            JsonPath *object_pathv = jsonPathPush(NULL, _INDEX(5), _KEY("112"), NULL);
+            JsonPath *object_pathv = jsonPathPush(NULL, jsonPathIndex(5), jsonPathKey("112"), NULL);
             assert(jsonCopys(falseNode, root, object_pathv) != NULL);
             new = jsonReads(root, object_pathv);
             assert(falseNode != NULL);
@@ -2191,7 +2209,7 @@ void jsonCopy_tests() {
             assert(*jsonReadLiteral(trueNode) != *jsonReadLiteral(new));
             assert(*jsonReadLiteral(falseNode) == *jsonReadLiteral(new));
 
-            JsonPath *object_Pathv = jsonPathPush(NULL, _INDEX(5), _KEY("113"), NULL );
+            JsonPath *object_Pathv = jsonPathPush(NULL, jsonPathIndex(5), jsonPathKey("113"), NULL );
             assert(jsonCopys(falseNode, root, object_Pathv) != NULL);
             new = jsonReads(root, object_Pathv);
             assert(falseNode != NULL);
@@ -2216,15 +2234,15 @@ void jsonCopy_tests() {
 
         // copy to array
         {
-            assert(jsonCopyl(oneNode, root, _INDEX(121)) != NULL);
-            new = jsonReadl(root, _INDEX(121));
+            assert(jsonCopyl(oneNode, root, jsonPathIndex(121)) != NULL);
+            new = jsonReadl(root, jsonPathIndex(121));
             assert(oneNode != NULL);
             assert(new != NULL);
             assert(oneNode != new);
             assert(*jsonReadDouble(oneNode) == *jsonReadDouble(new));
             assert(*jsonReadDouble(twoNode) != *jsonReadDouble(new));
 
-            JsonPath *array_pathv = jsonPathPush(NULL, _INDEX(122), NULL);
+            JsonPath *array_pathv = jsonPathPush(NULL, jsonPathIndex(122), NULL);
             assert(jsonCopys(twoNode, root, array_pathv) != NULL);
             new = jsonReads(root, array_pathv);
             assert(twoNode != NULL);
@@ -2233,7 +2251,7 @@ void jsonCopy_tests() {
             assert(*jsonReadDouble(twoNode) == *jsonReadDouble(new));
             assert(*jsonReadDouble(oneNode) != *jsonReadDouble(new));
 
-            JsonPath *array_Pathv = jsonPathPush(NULL, _INDEX(122), NULL );
+            JsonPath *array_Pathv = jsonPathPush(NULL, jsonPathIndex(122), NULL );
             assert(jsonCopys(twoNode, root, array_Pathv) != NULL);
             new = jsonReads(root, array_Pathv);
             assert(twoNode != NULL);
@@ -2245,15 +2263,15 @@ void jsonCopy_tests() {
 
         // copy to object
         {
-            assert(jsonCopyl(threeNode, root, _INDEX(5), _KEY("121")) != NULL);
-            new = jsonReadl(root, _INDEX(5), _KEY("121"));
+            assert(jsonCopyl(threeNode, root, jsonPathIndex(5), jsonPathKey("121")) != NULL);
+            new = jsonReadl(root, jsonPathIndex(5), jsonPathKey("121"));
             assert(threeNode != NULL);
             assert(new != NULL);
             assert(threeNode != new);
             assert(*jsonReadDouble(threeNode) == *jsonReadDouble(new));
             assert(*jsonReadDouble(fourNode) != *jsonReadDouble(new));
 
-            JsonPath *object_pathv = jsonPathPush(NULL, _INDEX(5), _KEY("122"), NULL);
+            JsonPath *object_pathv = jsonPathPush(NULL, jsonPathIndex(5), jsonPathKey("122"), NULL);
             assert(jsonCopys(fourNode, root, object_pathv) != NULL);
             new = jsonReads(root, object_pathv);
             assert(fourNode != NULL);
@@ -2262,7 +2280,7 @@ void jsonCopy_tests() {
             assert(*jsonReadDouble(threeNode) != *jsonReadDouble(new));
             assert(*jsonReadDouble(fourNode) == *jsonReadDouble(new));
 
-            JsonPath *object_Pathv = jsonPathPush(NULL, _INDEX(5), _KEY("122"), NULL );
+            JsonPath *object_Pathv = jsonPathPush(NULL, jsonPathIndex(5), jsonPathKey("122"), NULL );
             assert(jsonCopys(fourNode, root, object_Pathv) != NULL);
             new = jsonReads(root, object_Pathv);
             assert(fourNode != NULL);
@@ -2287,15 +2305,15 @@ void jsonCopy_tests() {
 
         // copy to array
         {
-            assert(jsonCopyl(oneNode, root, _INDEX(131)) != NULL);
-            new = jsonReadl(root, _INDEX(131));
+            assert(jsonCopyl(oneNode, root, jsonPathIndex(131)) != NULL);
+            new = jsonReadl(root, jsonPathIndex(131));
             assert(oneNode != NULL);
             assert(new != NULL);
             assert(oneNode != new);
             assert(strcmp(jsonReadStr(oneNode), jsonReadStr(new)) == 0);
             assert(strcmp(jsonReadStr(twoNode), jsonReadStr(new)) != 0);
 
-            JsonPath *array_pathv = jsonPathPush(NULL, _INDEX(132), NULL);
+            JsonPath *array_pathv = jsonPathPush(NULL, jsonPathIndex(132), NULL);
             assert(jsonCopys(twoNode, root, array_pathv) != NULL);
             new = jsonReads(root, array_pathv);
             assert(twoNode != NULL);
@@ -2304,7 +2322,7 @@ void jsonCopy_tests() {
             assert(strcmp(jsonReadStr(twoNode), jsonReadStr(new)) == 0);
             assert(strcmp(jsonReadStr(oneNode), jsonReadStr(new)) != 0);
 
-            JsonPath *array_paths = jsonPathPush(NULL, _INDEX(133), NULL );
+            JsonPath *array_paths = jsonPathPush(NULL, jsonPathIndex(133), NULL );
             assert(jsonCopys(twoNode, root, array_paths) != NULL);
             new = jsonReads(root, array_paths);
             assert(twoNode != NULL);
@@ -2316,15 +2334,15 @@ void jsonCopy_tests() {
 
         // copy to object
         {
-            assert(jsonCopyl(threeNode, root, _INDEX(5), _KEY("131")) != NULL);
-            new = jsonReadl(root, _INDEX(5), _KEY("131"));
+            assert(jsonCopyl(threeNode, root, jsonPathIndex(5), jsonPathKey("131")) != NULL);
+            new = jsonReadl(root, jsonPathIndex(5), jsonPathKey("131"));
             assert(threeNode != NULL);
             assert(new != NULL);
             assert(threeNode != new);
             assert(strcmp(jsonReadStr(threeNode), jsonReadStr(new)) == 0);
             assert(strcmp(jsonReadStr(fourNode), jsonReadStr(new)) != 0);
 
-            JsonPath *object_pathv = jsonPathPush(NULL, _INDEX(5), _KEY("132"), NULL);
+            JsonPath *object_pathv = jsonPathPush(NULL, jsonPathIndex(5), jsonPathKey("132"), NULL);
             assert(jsonCopys(fourNode, root, object_pathv) != NULL);
             new = jsonReads(root, object_pathv);
             assert(fourNode != NULL);
@@ -2333,7 +2351,7 @@ void jsonCopy_tests() {
             assert(strcmp(jsonReadStr(fourNode), jsonReadStr(new)) == 0);
             assert(strcmp(jsonReadStr(threeNode), jsonReadStr(new)) != 0);
 
-            JsonPath *object_paths = jsonPathPush(NULL, _INDEX(5), _KEY("133"), NULL );
+            JsonPath *object_paths = jsonPathPush(NULL, jsonPathIndex(5), jsonPathKey("133"), NULL );
             assert(jsonCopys(fourNode, root, object_paths) != NULL);
             new = jsonReads(root, object_paths);
             assert(fourNode != NULL);
@@ -2346,41 +2364,41 @@ void jsonCopy_tests() {
 
     // Test arrays
     {
-        JsonNode *array = jsonReadl(root, _INDEX(0), _KEY("all"));
+        JsonNode *array = jsonReadl(root, jsonPathIndex(0), jsonPathKey("all"));
 
         // copy to array
         {
             JsonNode *one = NULL;
 
-            assert(jsonCopyl(array, root, _INDEX(141)) != NULL);
-            new = jsonReadl(root, _INDEX(141));
+            assert(jsonCopyl(array, root, jsonPathIndex(141)) != NULL);
+            new = jsonReadl(root, jsonPathIndex(141));
             assert(array != NULL);
             assert(new != NULL);
             assert(array != new);
-            one = jsonReadl(root, _INDEX(141), _INDEX(0));
+            one = jsonReadl(root, jsonPathIndex(141), jsonPathIndex(0));
             assert(one != NULL);
             assert(jsonReadDouble(one) != NULL);
             assert(*jsonReadDouble(one) == 1.0);
 
-            JsonPath *array_pathv = jsonPathPush(NULL, _INDEX(142), NULL);
+            JsonPath *array_pathv = jsonPathPush(NULL, jsonPathIndex(142), NULL);
             assert(jsonCopys(array, root, array_pathv) != NULL);
             new = jsonReads(root, array_pathv);
             assert(array != NULL);
             assert(new != NULL);
             assert(array != new);
-            JsonPath *array_pathv2 = jsonPathPush(NULL, _INDEX(142), _INDEX(0), NULL);
+            JsonPath *array_pathv2 = jsonPathPush(NULL, jsonPathIndex(142), jsonPathIndex(0), NULL);
             one = jsonReads(root, array_pathv2);
             assert(one != NULL);
             assert(jsonReadDouble(one) != NULL);
             assert(*jsonReadDouble(one) == 1.0);
 
-            JsonPath *array_paths = jsonPathPush(NULL, _INDEX(143), NULL );
+            JsonPath *array_paths = jsonPathPush(NULL, jsonPathIndex(143), NULL );
             assert(jsonCopys(array, root, array_paths) != NULL);
             new = jsonReads(root, array_paths);
             assert(array != NULL);
             assert(new != NULL);
             assert(array != new);
-            JsonPath *array_paths2 = jsonPathPush(NULL, _INDEX(143), _INDEX(0), NULL );
+            JsonPath *array_paths2 = jsonPathPush(NULL, jsonPathIndex(143), jsonPathIndex(0), NULL );
             one = jsonReads(root, array_paths2);
             assert(one != NULL);
             assert(jsonReadDouble(one) != NULL);
@@ -2391,35 +2409,35 @@ void jsonCopy_tests() {
         {
             JsonNode *eight = NULL;
 
-            assert(jsonCopyl(array, root, _INDEX(5), _KEY("test_arrayl")) != NULL);
-            new = jsonReadl(root, _INDEX(5), _KEY("test_arrayl"));
+            assert(jsonCopyl(array, root, jsonPathIndex(5), jsonPathKey("test_arrayl")) != NULL);
+            new = jsonReadl(root, jsonPathIndex(5), jsonPathKey("test_arrayl"));
             assert(array != NULL);
             assert(new != NULL);
             assert(array != new);
-            eight = jsonReadl(root, _INDEX(5), _KEY("test_arrayl"), _INDEX(7));
+            eight = jsonReadl(root, jsonPathIndex(5), jsonPathKey("test_arrayl"), jsonPathIndex(7));
             assert(eight != NULL);
             assert(jsonReadDouble(eight) != NULL);
             assert(*jsonReadDouble(eight) == 8.0);
 
-            JsonPath *array_pathv = jsonPathPush(NULL, _INDEX(5), _KEY("test_arrayv"), NULL);
+            JsonPath *array_pathv = jsonPathPush(NULL, jsonPathIndex(5), jsonPathKey("test_arrayv"), NULL);
             assert(jsonCopys(array, root, array_pathv) != NULL);
             new = jsonReads(root, array_pathv);
             assert(array != NULL);
             assert(new != NULL);
             assert(array != new);
-            JsonPath *array_pathv2 = jsonPathPush(NULL, _INDEX(5), _KEY("test_arrayv"), _INDEX(7), NULL);
+            JsonPath *array_pathv2 = jsonPathPush(NULL, jsonPathIndex(5), jsonPathKey("test_arrayv"), jsonPathIndex(7), NULL);
             eight = jsonReads(root, array_pathv2);
             assert(eight != NULL);
             assert(jsonReadDouble(eight) != NULL);
             assert(*jsonReadDouble(eight) == 8.0);
 
-            JsonPath *array_paths = jsonPathPush(NULL, _INDEX(5), _KEY("test_arrayv"), NULL);
+            JsonPath *array_paths = jsonPathPush(NULL, jsonPathIndex(5), jsonPathKey("test_arrayv"), NULL);
             assert(jsonCopys(array, root, array_paths) != NULL);
             new = jsonReads(root, array_paths);
             assert(array != NULL);
             assert(new != NULL);
             assert(array != new);
-            JsonPath *array_paths2 = jsonPathPush(NULL, _INDEX(5), _KEY("test_arrayv"), _INDEX(7), NULL);
+            JsonPath *array_paths2 = jsonPathPush(NULL, jsonPathIndex(5), jsonPathKey("test_arrayv"), jsonPathIndex(7), NULL);
             eight = jsonReads(root, array_paths2);
             assert(eight != NULL);
             assert(jsonReadDouble(eight) != NULL);
@@ -2432,38 +2450,38 @@ void jsonCopy_tests() {
         // copy to array
         {
             JsonNode *fivefives = NULL;
-            JsonNode *object = jsonReadl(root, _INDEX(5));
+            JsonNode *object = jsonReadl(root, jsonPathIndex(5));
             assert(object != NULL);
 
-            assert(jsonCopyl(object, root, _INDEX(151)) != NULL);
-            new = jsonReadl(root, _INDEX(151));
+            assert(jsonCopyl(object, root, jsonPathIndex(151)) != NULL);
+            new = jsonReadl(root, jsonPathIndex(151));
             assert(object != NULL);
             assert(new != NULL);
             assert(object != new);
-            fivefives = jsonReadl(root, _INDEX(151), _KEY("333"));
+            fivefives = jsonReadl(root, jsonPathIndex(151), jsonPathKey("333"));
             assert(fivefives != NULL);
             assert(jsonReadStr(fivefives) != NULL);
             assert(!strcmp("55555", jsonReadStr(fivefives)));
 
-            JsonPath *object_pathv = jsonPathPush(NULL, _INDEX(152), NULL);
+            JsonPath *object_pathv = jsonPathPush(NULL, jsonPathIndex(152), NULL);
             assert(jsonCopys(object, root, object_pathv) != NULL);
             new = jsonReads(root, object_pathv);
             assert(object != NULL);
             assert(new != NULL);
             assert(object != new);
-            JsonPath *object_pathv2 = jsonPathPush(NULL, _INDEX(152), _KEY("333"), NULL);
+            JsonPath *object_pathv2 = jsonPathPush(NULL, jsonPathIndex(152), jsonPathKey("333"), NULL);
             fivefives = jsonReads(root, object_pathv2);
             assert(fivefives != NULL);
             assert(jsonReadStr(fivefives) != NULL);
             assert(!strcmp("55555", jsonReadStr(fivefives)));
 
-            JsonPath *object_paths = jsonPathPush(NULL, _INDEX(153), NULL );
+            JsonPath *object_paths = jsonPathPush(NULL, jsonPathIndex(153), NULL );
             assert(jsonCopys(object, root, object_paths) != NULL);
             new = jsonReads(root, object_paths);
             assert(object != NULL);
             assert(new != NULL);
             assert(object != new);
-            JsonPath *object_paths2 = jsonPathPush(NULL, _INDEX(153), _KEY("333"), NULL );
+            JsonPath *object_paths2 = jsonPathPush(NULL, jsonPathIndex(153), jsonPathKey("333"), NULL );
             fivefives = jsonReads(root, object_paths2);
             assert(fivefives != NULL);
             assert(jsonReadStr(fivefives) != NULL);
@@ -2473,40 +2491,40 @@ void jsonCopy_tests() {
         // copy to object
         {
             JsonNode *object;
-            object = jsonReadl(root, _INDEX(0));
+            object = jsonReadl(root, jsonPathIndex(0));
             assert(object != NULL);
 
             JsonNode *seven = NULL;
 
-            assert(jsonCopyl(object, root, _INDEX(5), _KEY("l")) != NULL);
-            new = jsonReadl(root, _INDEX(5), _KEY("l"));
+            assert(jsonCopyl(object, root, jsonPathIndex(5), jsonPathKey("l")) != NULL);
+            new = jsonReadl(root, jsonPathIndex(5), jsonPathKey("l"));
             assert(object != NULL);
             assert(new != NULL);
             assert(object != new);
-            seven = jsonReadl(root, _INDEX(5), _KEY("l"), _KEY("7"));
+            seven = jsonReadl(root, jsonPathIndex(5), jsonPathKey("l"), jsonPathKey("7"));
             assert(seven != NULL);
             assert(jsonReadDouble(seven) != NULL);
             assert(*jsonReadDouble(seven) == 7.0);
 
-            JsonPath *object_pathv = jsonPathPush(NULL, _INDEX(5), _KEY("v"), NULL);
+            JsonPath *object_pathv = jsonPathPush(NULL, jsonPathIndex(5), jsonPathKey("v"), NULL);
             assert(jsonCopys(object, root, object_pathv) != NULL);
             new = jsonReads(root, object_pathv);
             assert(object != NULL);
             assert(new != NULL);
             assert(object != new);
-            JsonPath *object_pathv2 = jsonPathPush(NULL, _INDEX(5), _KEY("v"), _KEY("7"), NULL);
+            JsonPath *object_pathv2 = jsonPathPush(NULL, jsonPathIndex(5), jsonPathKey("v"), jsonPathKey("7"), NULL);
             seven = jsonReads(root, object_pathv2);
             assert(seven != NULL);
             assert(jsonReadDouble(seven) != NULL);
             assert(*jsonReadDouble(seven) == 7.0);
 
-            JsonPath *object_paths = jsonPathPush(NULL, _INDEX(5), _KEY("s"), NULL );
+            JsonPath *object_paths = jsonPathPush(NULL, jsonPathIndex(5), jsonPathKey("s"), NULL );
             assert(jsonCopys(object, root, object_paths) != NULL);
             new = jsonReads(root, object_paths);
             assert(object != NULL);
             assert(new != NULL);
             assert(object != new);
-            JsonPath *object_paths2 = jsonPathPush(NULL, _INDEX(5), _KEY("s"), _KEY("7"), NULL );
+            JsonPath *object_paths2 = jsonPathPush(NULL, jsonPathIndex(5), jsonPathKey("s"), jsonPathKey("7"), NULL );
             seven = jsonReads(root, object_paths2);
             assert(seven != NULL);
             assert(jsonReadDouble(seven) != NULL);
