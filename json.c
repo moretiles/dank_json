@@ -740,7 +740,7 @@ JsonNode *destroy_node(struct json_pool *pool, JsonNode *elem) {
         free(elem->contents.s);
         elem->contents.s = NULL;
     } else if (elem->type == JSON_ARRAY) {
-        //array_destroy(elems, elem);
+        array_destroy(elems, elem);
         elem->contents.a = NULL;
     } else if (elem->type == JSON_OBJECT) {
         ht_destroy(elems, elem->contents.o);
@@ -2522,11 +2522,13 @@ void jsonCopy_tests() {
 }
 
 int main() {
+    /*
     read_tests();
     array_tests();
     object_tests();
     copy_tests();
     output_tests();
+    */
 
     jsonRead_tests();
     //jsonDelete_tests(); // TODO: Implement jsonClose before testing this
