@@ -1,4 +1,4 @@
-CFLAGS=-Wall -Wextra
+CFLAGS=-Wall -Wextra --std=c23
 DEBUG=-g3 -ggdb
 OPTIMIZE=-O3
 
@@ -23,23 +23,29 @@ release:
 
 
 ## build for development
-json: json.o queue.o hash.o array.o pool.o
-	${CC} ${CFLAGS} ${DEBUG} ${START_SMALL} ${TEST_BUILD} json.o queue.o hash.o array.o pool.o -o json
+json: json.o jsonpath.o queue.o hash.o array.o pool.o cstring.o
+	${CC} ${CFLAGS} ${DEBUG} ${START_SMALL} ${TEST_BUILD} json.o jsonpath.o queue.o hash.o array.o pool.o cstring.o -o json
 
-json.o: json.c
+json.o: json.c json.h ds.h
 	${CC} ${CFLAGS} ${DEBUG} ${START_SMALL} ${TEST_BUILD} json.c -c -o json.o
 
-queue.o: queue.c
+jsonpath.o: jsonpath.c jsonpath.h ds.h
+	${CC} ${CFLAGS} ${DEBUG} ${START_SMALL} ${TEST_BUILD} jsonpath.c -c -o jsonpath.o
+
+queue.o: queue.c queue.h ds.h
 	${CC} ${CFLAGS} ${DEBUG} ${START_SMALL} ${TEST_BUILD} queue.c -c -o queue.o
 
-hash.o: hash.c
+hash.o: hash.c hash.h ds.h
 	${CC} ${CFLAGS} ${DEBUG} ${START_SMALL} ${TEST_BUILD} hash.c -c -o hash.o
 
-array.o: array.c
+array.o: array.c array.h ds.h
 	${CC} ${CFLAGS} ${DEBUG} ${START_SMALL} ${TEST_BUILD} array.c -c -o array.o
 
-pool.o: pool.c
+pool.o: pool.c pool.h ds.h
 	${CC} ${CFLAGS} ${DEBUG} ${START_SMALL} ${TEST_BUILD} pool.c -c -o pool.o
+
+cstring.o: cstring.c cstring.h
+	${CC} ${CFLAGS} ${DEBUG} ${START_SMALL} ${TEST_BUILD} cstring.c -c -o cstring.o
 
 clean:
 	rm -f json tags *.ast *.pch *.plist *.o externalDefMap.txt gmon.out

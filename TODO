@@ -1,26 +1,14 @@
 Progress map
 
-Immediate
-* Refactor path struct as path_component, create actual path struct that holds a linked list of path components and functions as a kind of stack. Path struct would have push, pop, and clear functions.
-```
-typedef struct path {
-    PathComponent *head;
-    PathComponent *tail;
-    size_t members;
-} Path;
-```
-* Refactor functions related to deep copying a read as copying
-* Removes tests related to shallow copy
-* Use type aliased to char for flags
-* Use type aliased to char for type that a node holds
-* Implement jsonCheckType and jsonRead${TYPE} functions
-
 Core functionality
+* Split into public and private header
+* Remove deprecated (unused functions, argv style function calls).
 * Handle memory leaks for jsonCreate family
 * Give structs better names in the public interface.
+* Create public and private header files.
 
 Nice to have:
-* Make sure JSON dictionaries are sorted in the same order as input.
+* Make sure JSON dictionaries are sorted in the same order as input. (can use the existing prev and next pointers).
 * Use wchar_t for strings to properly handle 2 byte escapes (like \xabcd).
 * Use prev and next to connect together active nodes in a dictionary (saving deallocation time).
 

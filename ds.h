@@ -132,7 +132,6 @@ struct json_path_partial {
     union path_holds path;
     jsonType type;
     struct json_path_partial *prev;
-    struct json_path_partial *next;
 };
 
 typedef struct json_path {
