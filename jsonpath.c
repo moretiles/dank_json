@@ -1,5 +1,25 @@
 #include "jsonpath.h"
 
+struct json_path_partial jsonPathIndex(size_t index) {
+    struct json_path_partial ret = { 0 };
+
+    ret.prev = 0;
+    ret.path.index = index;
+    ret.type = JSON_ARRAY;
+
+    return ret;
+}
+
+struct json_path_partial jsonPathKey(char *src) {
+    struct json_path_partial ret = { 0 };
+
+    ret.prev = 0;
+    ret.path.key = src;
+    ret.type = JSON_OBJECT;
+
+    return ret;
+}
+
 struct json_path_partial *copy_json_path_partial(struct json_path_partial *src) {
     if(src == NULL) {
         return NULL;

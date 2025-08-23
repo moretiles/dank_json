@@ -12,7 +12,7 @@ extern char get_sep(struct queue *store);
 // array
 int array_add_node(JsonNode *array, JsonNode *elem);
 int array_insert_node(JsonNode *array, JsonNode *elem, size_t pos);
-int array_destroy_node(struct json_pool *pool, JsonNode *array,
-                       JsonNode *elem);
+int array_destroy_node(struct json_pool *pool, JsonNode *array, JsonNode *elem);
+int array_destroy(struct json_pool *pool, JsonNode *array);
 JsonNode *array_get_nth(JsonNode *array, size_t n);
 JsonNode *get_json_array(struct json_pool *pool, struct queue *file, struct queue *scratch, JsonNode *elem);

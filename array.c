@@ -81,8 +81,7 @@ int array_insert_node(JsonNode *array, JsonNode *elem, size_t pos) {
     return 0;
 }
 
-int array_destroy_node(struct json_pool *pool, JsonNode *array,
-                       JsonNode *elem) {
+int array_destroy_node(struct json_pool *pool, JsonNode *array, JsonNode *elem) {
     JsonNode *prev = NULL, *next = NULL;
 
     /*
@@ -91,6 +90,11 @@ int array_destroy_node(struct json_pool *pool, JsonNode *array,
      */
     if (!pool || !array || !elem || array->type != JSON_ARRAY) {
         return 1;
+    }
+
+    if(elem->prev != NULL && elem->prev == elem->next) {
+        elem->prev = NULL;
+        elem->next = NULL;
     }
 
     if (elem->prev && elem->next) {
@@ -111,6 +115,16 @@ int array_destroy_node(struct json_pool *pool, JsonNode *array,
     elem->next = NULL;
 
     destroy_node(pool, elem);
+    return 0;
+}
+
+int array_destroy(struct json_pool *pool, JsonNode *array) {
+    if(pool == NULL || array == NULL || !(array->type & JSON_ARRAY)) {
+        return 1;
+    }
+
+    while(array_destroy_node(pool, array, array_get_nth(array, 0)));
+
     return 0;
 }
 
