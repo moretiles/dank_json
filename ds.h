@@ -13,7 +13,7 @@
 #define JSON_ELEM_IS_HEAD (1 << 7)
 #define JSON_ELEM_IS_TAIL (1 << 6)
 #define JSON_ELEM_CONTENTS_ON_HEAP (1 << 5)
-//#define ... (1 << 4)
+#define JSON_ELEM_IS_OPEN_FILE (1 << 4)
 //#define ... (1 << 3)
 #define JSON_NUM_IS_INT (1 << 2)
 #define JSON_NUM_IS_SCIENTIFIC (1 << 1)

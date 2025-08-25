@@ -1,14 +1,11 @@
 Progress map
 
 Core functionality
+* Use prev and next to connect together active nodes in a dictionary (saving deallocation time).
+* Make sure JSON dictionaries are sorted in the same order as input. (can use the existing prev and next pointers).
+* Make it so that the head of an array keeps track of it's parent using prev so calling jsonDelete communicates to the parent properly.
+* Use wchar_t for strings to properly handle 2 byte escapes (like \xabcd).
 * Split into public and private header
     * Define jsonLiteral JSON_TRUE, JSON_FALSE inside the private header. Mark them as extern within the public header.
     * Move jsonUpdate family of functions to privat header, they are useful but redundent when jsonCreate can update and create if a node does not exist.
-* Make it so that the head of an array keeps track of it's parent using prev so calling jsonDelete communicates to the parent properly.
-* Define proper jsonClose function to close file and terminate associated nodes.
-* Give structs better names in the public interface.
-
-Nice to have:
-* Use prev and next to connect together active nodes in a dictionary (saving deallocation time).
-* Make sure JSON dictionaries are sorted in the same order as input. (can use the existing prev and next pointers).
-* Use wchar_t for strings to properly handle 2 byte escapes (like \xabcd).
+* Give api and structs better names in the public interface.

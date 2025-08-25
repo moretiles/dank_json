@@ -5,6 +5,25 @@
 
 #include "hash.h"
 
+struct ht *ht_init(size_t numElems) {
+    struct ht *ret = calloc(1, sizeof(struct ht));
+    char **keys = calloc(numElems, sizeof(char *));
+    JsonNode **vals = calloc(numElems, sizeof(JsonNode *));
+
+    if (ret == NULL || keys == NULL || vals == NULL) {
+        free(ret);
+        free(keys);
+        free(vals);
+        return NULL;
+    }
+    ret->keys = keys;
+    ret->vals = vals;
+    ret->count = 0;
+    ret->cap = numElems;
+
+    return ret;
+}
+
 uint64_t fnv(const char *data, size_t len) {
     /* There is no bug here.
      * It is okay for __uint128_t to hold a value that would be to big
@@ -48,7 +67,7 @@ int fnv_hash(const char *data, uint32_t *offset, uint32_t *iterate) {
     return 0;
 }
 
-JsonNode *ht_insert(struct ht *table, char *key, JsonNode *val) {
+JsonNode *ht_insert(struct ht *table, const char *key, JsonNode *val) {
     if (table == NULL || key == NULL || val == NULL) {
         return NULL;
     }
@@ -108,7 +127,7 @@ JsonNode *ht_insert_direct(struct ht *table, char *key, JsonNode *val) {
     table->count += 1;
     table->keys[offset % table->cap] = key;
     table->vals[offset % table->cap] = val;
-    if (table->count > table->cap / 2) {
+    if (table->count + 1 > table->cap / 2) {
         new = ht_grow(table, (size_t)(table->cap * 2));
         if (new != NULL) {
             table = new;
@@ -117,7 +136,7 @@ JsonNode *ht_insert_direct(struct ht *table, char *key, JsonNode *val) {
     return ht_find(table, key);
 }
 
-JsonNode *ht_find(struct ht *table, char *key) {
+JsonNode *ht_find(struct ht *table, const char *key) {
     if (table == NULL || key == NULL) {
         return NULL;
     }
@@ -139,7 +158,7 @@ JsonNode *ht_find(struct ht *table, char *key) {
     return NULL;
 }
 
-JsonNode *ht_set(struct ht *table, char *key, JsonNode *elem) {
+JsonNode *ht_set(struct ht *table, const char *key, JsonNode *elem) {
     if (table == NULL || key == NULL || elem == NULL) {
         return NULL;
     }
@@ -171,6 +190,7 @@ JsonNode *ht_del(struct json_pool *pool, struct ht *table, const char *key) {
             table->keys[offset % table->cap] = NULL;
             destroy_node(pool, table->vals[offset % table->cap]);
             table->vals[offset % table->cap] = NULL;
+            table->count -= 1;
             return cleared;
         } else if (table->keys[offset % table->cap] == NULL &&
                    table->vals[offset % table->cap] == NULL) {
@@ -179,6 +199,28 @@ JsonNode *ht_del(struct json_pool *pool, struct ht *table, const char *key) {
         offset += iterate;
         max_possible -= 1;
     }
+    return NULL;
+}
+
+JsonNode *ht_del_by_val(struct json_pool *pool, struct ht *table, const JsonNode *val) {
+    size_t i = 0, seen = 0;
+    JsonNode *deleted = NULL;
+
+    for(i = 0; i < table->cap && seen < table->count; i++) {
+        if(table->vals[i] != NULL) {
+            seen++;
+            if(table->vals[i] == val) {
+                free(table->keys[i]);
+                table->keys[i] = NULL;
+                deleted = destroy_node(pool, table->vals[i]);
+                table->vals[i] = NULL;
+
+                table->count -= 1;
+                return deleted;
+            }
+        }
+    }
+
     return NULL;
 }
 

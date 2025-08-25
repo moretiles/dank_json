@@ -12,13 +12,14 @@
 #define TEST_BUILD (0)
 #endif
 
-struct queue scratch;
-struct json_pool *elems;
+struct queue scratch = { 0 };
+struct ht *openFiles = NULL;
+struct json_pool *elems = NULL;
 
 int jsonLibInit() {
     void *ptr = NULL;
     // Maybe check env variables for max sizes
-    if (scratch.chars != NULL && elems != NULL) {
+    if (scratch.chars != NULL || openFiles != NULL || elems != NULL) {
         return 1;
     }
 
@@ -30,6 +31,8 @@ int jsonLibInit() {
     scratch.base = 0;
     scratch.pos = 0;
     scratch.cap = 2 * MAX_STR_SIZE;
+
+    openFiles = ht_init(OBJECT_STARTING_SIZE);
 
     ptr = calloc(1, sizeof(struct json_pool));
     if (!ptr) {
@@ -85,7 +88,16 @@ JsonNode *jsonOpen(const char *fileName) {
     free(chars);
     free(new);
 
+    root->flags |= JSON_ELEM_IS_OPEN_FILE;
+    ht_insert(openFiles, fileName, root);
+
     return root;
+}
+
+void jsonClose(const char *fileName) {
+    if(fileName != NULL) {
+        jsonDelete(ht_find(openFiles, fileName));
+    }
 }
 
 int jsonLibEnd() {
@@ -95,6 +107,10 @@ int jsonLibEnd() {
         free(scratch.chars);
         memset(&scratch, 0, sizeof(struct queue));
     }
+
+    ht_destroy(elems, openFiles);
+    openFiles = NULL;
+
     ret = destroy_pool(elems);
     elems = NULL;
     return ret;
@@ -446,6 +462,8 @@ JsonNode *jsonCopy(JsonNode *root) {
 }
 
 JsonNode *jsonUpdate(void *src, char type, JsonNode *root) {
+    struct ht *newHt = NULL;
+
     if ((src == NULL && type != JSON_ARRAY && type != JSON_OBJECT) || root == NULL) {
         return NULL;
     }
@@ -488,26 +506,13 @@ JsonNode *jsonUpdate(void *src, char type, JsonNode *root) {
         break;
 
     case JSON_OBJECT:
-        root->contents.o = calloc(1, sizeof(struct ht));
+        newHt = ht_init(OBJECT_STARTING_SIZE);
+        if(newHt == NULL) {
+            return NULL;
+        }
+        root->contents.o = newHt;
         root->flags &= mask;
         root->type = JSON_OBJECT;
-        if (root->contents.o == NULL) {
-            jsonDelete(root);
-            return NULL;
-        }
-        char **keys = calloc(OBJECT_STARTING_SIZE, sizeof(char *));
-        JsonNode **vals = calloc(OBJECT_STARTING_SIZE, sizeof(JsonNode *));
-        if (root->contents.o == NULL || keys == NULL || vals == NULL) {
-            free(root->contents.o);
-            free(keys);
-            free(vals);
-            jsonDelete(root);
-            return NULL;
-        }
-        root->contents.o->keys = keys;
-        root->contents.o->vals = vals;
-        root->contents.o->count = 0;
-        root->contents.o->cap = OBJECT_STARTING_SIZE;
         break;
 
     default:
@@ -552,7 +557,11 @@ int jsonOut(FILE *dest, char minify, JsonNode *root) {
 }
 
 JsonNode *jsonDelete(JsonNode *elem) {
-    return destroy_node(elems, elem);
+    if(elem->flags & JSON_ELEM_IS_OPEN_FILE) {
+        return ht_del_by_val(elems, openFiles, elem);
+    } else {
+        return destroy_node(elems, elem);
+    }
 }
 
 JsonNode *jsonDeletes(JsonNode *root, JsonPath *path) {
@@ -1736,6 +1745,29 @@ void jsonRead_tests() {
     jsonLibEnd();
 }
 
+void jsonDelete_tests() {
+    jsonLibInit();
+    const char *array1_path = "./tests/array1.json";
+    const char *object1_path = "./tests/object1.json";
+    const char *test_path = "./tests/test.json";
+    const char *test2_path = "./tests/test2.json";
+
+    JsonNode *array1 = jsonOpen(array1_path);
+    JsonNode *object1 = jsonOpen(object1_path);
+    JsonNode *test = jsonOpen(test_path);
+    JsonNode *test2 = jsonOpen(test2_path);
+    assert(array1 != NULL && object1 != NULL && test != NULL && test2 != NULL);
+
+    jsonClose(array1_path);
+    assert((array1->type & META_FREE) && !(array1->type & JSON_ELEM_IS_OPEN_FILE));
+    assert(ht_find(openFiles, array1_path) == NULL);
+    jsonDelete(object1);
+    assert((object1->type & META_FREE) && !(object1->type & JSON_ELEM_IS_OPEN_FILE));
+    assert(ht_find(openFiles, object1_path) == NULL);
+
+    jsonLibEnd();
+}
+
 void output_tests() {
     jsonLibInit();
 
@@ -2613,7 +2645,7 @@ int main() {
     */
 
     jsonRead_tests();
-    //jsonDelete_tests(); // TODO: Implement jsonClose before testing this
+    jsonDelete_tests();
     jsonUpdate_tests();
     jsonCopy_tests();
     jsonCreate_tests();
