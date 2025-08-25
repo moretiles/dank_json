@@ -159,7 +159,7 @@ JsonNode *array_get_nth(JsonNode *array, size_t n) {
 
 JsonNode *get_json_array(struct json_pool *pool, struct queue *file, struct queue *scratch, JsonNode *elem) {
     JsonNode *from_pool = NULL;
-    JsonNode current;
+    JsonNode current = { 0 };
     char sep = ',', error = 0;
 
     // printf("inside array\n");
@@ -176,7 +176,7 @@ JsonNode *get_json_array(struct json_pool *pool, struct queue *file, struct queu
             return NULL;
         }
         process(file, &current);
-        if(current.type != JSON_CLOSE) {
+        if(!(current.type & JSON_CLOSE)) {
             //from_pool = new_node(elems);
             from_pool = new_node(pool);
             memcpy(from_pool, &current, sizeof(JsonNode));

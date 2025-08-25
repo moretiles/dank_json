@@ -82,9 +82,9 @@ test:
 	@echo '================================='
 	@./json
 	@echo '================================='
-	clang ${START_SMALL} ${TEST_BUILD} -emit-ast ${DEPENDS}
+	clang ${CFLAGS} ${START_SMALL} ${TEST_BUILD} -emit-ast ${DEPENDS}
 	clang-extdef-mapping ${DEPENDS} | sed 's/\.c/\.ast/' | sed 's/\.h/\.h\.pch/g' > externalDefMap.txt
-	clang --analyze ${START_SMALL} ${TEST_BUILD} \
+	clang ${CFLAGS} --analyze ${START_SMALL} ${TEST_BUILD} \
 		-Xclang -analyzer-config -Xclang experimental-enable-naive-ctu-analysis=true \
 		-Xclang -analyzer-config -Xclang ctu-dir=. \
 		-Xclang -analyzer-output=plist-multi-file \

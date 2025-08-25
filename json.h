@@ -43,16 +43,6 @@ JsonNode *jsonOpen(const char *fileName);
 void jsonClose(const char *fileName);
 int jsonLibEnd();
 
-
-#define _KEY(k)                                                                \
-  &((struct json_path_partial) {.path.key = k, .type = JSON_OBJECT, .prev = NULL})
-
-/*
- *  * Expresses an offset as an index to be used when accessing an array's fields.
- *   */
-#define _INDEX(i)                                                              \
-    &((struct json_path_partial) {.path.index = i, .type = JSON_ARRAY, .prev = NULL})
-
 /*
  * Provides you with a new node.
  *
@@ -150,6 +140,7 @@ JsonNode *new_node(struct json_pool *pool);
 JsonNode *copy_json_node(JsonNode *dest, JsonNode *src);
 JsonNode *copy_json_node_preserve_references(JsonNode *dest, JsonNode *src);
 JsonNode *destroy_node(struct json_pool *pool, JsonNode *elem);
+JsonNode *destroy_node_contents(JsonNode *elem);
 JsonNode *process(struct queue *file, JsonNode *elem);
 
 // internal output function
