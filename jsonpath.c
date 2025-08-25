@@ -67,7 +67,7 @@ int delete_json_path_partial(struct json_path_partial *path_partial) {
 
 JsonPath *_jsonPathPush(JsonPath *path, ...) {
     va_list args;
-    va_start(args);
+    va_start(args, path);
 
     if(path == NULL) {
         path = calloc(sizeof(JsonPath), 1);
