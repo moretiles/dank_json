@@ -54,9 +54,9 @@ int jsonLibEnd();
  * 3. Calling jsonEnd.
  */
 JsonNode *_jsonCreate();
-JsonNode *jsonCreate(void *src, char type);
+JsonNode *jsonCreate(const void *src, char type);
 #define jsonCreatel(src, type, root, args...) jsonUpdate(src, type, jsonCopyl(_jsonCreate(), root, ##args, NULL))
-JsonNode *jsonCreates(void *src, char type, JsonNode *root, JsonPath *path);
+JsonNode *jsonCreates(const void *src, char type, JsonNode *root, JsonPath *path);
 
 // read
 JsonNode *_jsonReadl(JsonNode *root, ...);
@@ -65,9 +65,9 @@ JsonNode *jsonReads(JsonNode *root, JsonPath *path);
 JsonNode *jsonReads_recurse(JsonNode *root, struct json_path_partial *path);
 
 // update
-JsonNode *jsonUpdate(void *src, char type, JsonNode *root);
+JsonNode *jsonUpdate(const void *src, char type, JsonNode *root);
 #define jsonUpdatel(src, type, root, args...) jsonUpdate(src, type, jsonReadl(root, ##args, NULL))
-JsonNode *jsonUpdates(void *src, char type, JsonNode *root, JsonPath *path);
+JsonNode *jsonUpdates(const void *src, char type, JsonNode *root, JsonPath *path);
 
 // copy
 JsonNode *jsonCopy(JsonNode *root);
