@@ -6,7 +6,7 @@
 
 #ifndef _CUSTOM_CSTRING_FUNCTIONS
 #define _CUSTOM_CSTRING_FUNCTIONS 1
-char *cstrncpy(char *dest, char *src, size_t m) {
+char *cstrncpy(char *dest, const char *src, size_t m) {
     size_t n = 0;
 
     if (m == 0 || dest == NULL || src == NULL) {

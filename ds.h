@@ -109,10 +109,14 @@ struct json_pool {
 };
 
 struct ht {
-    char **keys;
+    JsonNode **keys;
     JsonNode **vals;
     size_t count;
     size_t cap;
+    JsonNode *head_key;
+    JsonNode *tail_key;
+    JsonNode *head_val;
+    JsonNode *tail_val;
 };
 
 union path_holds {
