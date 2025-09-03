@@ -1,14 +1,36 @@
 #include "array.h"
 
+JsonNode *array_head(JsonNode *array) {
+    if(array == NULL || !(array->type & JSON_ARRAY) || array->contents.a == NULL) {
+        return NULL;
+    }
+
+    return array->contents.a;
+}
+
+JsonNode *array_tail(JsonNode *array) {
+    if(array == NULL || !(array->type & JSON_ARRAY) || array->contents.a == NULL) {
+        return NULL;
+    }
+
+    if(array->contents.a->flags & JSON_ELEM_IS_TAIL) {
+        return array->contents.a;
+    } else if(array->contents.a->prev != NULL && array->contents.a->prev->flags & JSON_ELEM_IS_TAIL) {
+        return array->contents.a->prev;
+    } else {
+        return NULL;
+    }
+}
+
+
 int array_add_node(JsonNode *array, JsonNode *elem) {
     JsonNode *head = NULL, *tail = NULL;
     if (!elem || !array || array->type != JSON_ARRAY) {
         return 1;
     }
-    head = array->contents.a;
-    if (head && head->prev) {
-        tail = head->prev;
-    };
+
+    head = array_head(array);
+    tail = array_tail(array);
 
     if (!head) {
         array->contents.a = elem;
@@ -39,8 +61,7 @@ int array_insert_node(JsonNode *array, JsonNode *elem, size_t pos) {
     JsonNode *prev = NULL, *current = NULL, *next = NULL;
     size_t init = pos;
 
-    if (!elem || !array || array->type != JSON_ARRAY ||
-            (pos > 0 && array->contents.a == NULL)) {
+    if (!elem || !array || array->type != JSON_ARRAY) {
         return 1;
     }
 
@@ -51,7 +72,7 @@ int array_insert_node(JsonNode *array, JsonNode *elem, size_t pos) {
         }
     }
 
-    current = array->contents.a;
+    current = array_head(array);
     prev = current->prev;
     next = current->next;
 
@@ -145,7 +166,7 @@ JsonNode *array_get_nth(JsonNode *array, size_t n) {
         return NULL;
     }
 
-    elem = array->contents.a;
+    elem = array_head(array);
     while (n != 0 && elem != NULL && !(elem->flags & JSON_ELEM_IS_TAIL)) {
         n--;
         elem = elem->next;

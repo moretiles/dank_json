@@ -23,7 +23,7 @@ int jsonLibInit() {
         return 1;
     }
 
-    ptr = calloc(2 * MAX_STR_SIZE, sizeof(char));
+    ptr = calloc(2 * MAX_STR_SIZE + 1, sizeof(char));
     if (ptr == NULL) {
         return 3;
     }
@@ -227,7 +227,7 @@ JsonNode *jsonReads_recurse(JsonNode *root, struct json_path_partial *path) {
         root = jsonReads_recurse(root, path->prev);
     }
 
-    if(root == NULL || !(root->type & path->type)) {
+    if(root == NULL || !jsonIsType(path->type, root)) {
         return NULL;
     }
 
@@ -283,7 +283,7 @@ JsonNode *_jsonCopyl(JsonNode *node, JsonNode *root, ...) {
             }
             current = array_get_nth(current, path->path.index);
             while(current == NULL) {
-                if(child && child->type & (JSON_ARRAY | JSON_OBJECT)) {
+                if(child && (!(JSON_ARRAY & child->type) || !(JSON_OBJECT & child->type))) {
                     created = array_add_node(parent, jsonCreate(NULL, child->type));
                 } else {
                     jsonLiteral null = JSON_NULL;
@@ -306,7 +306,7 @@ JsonNode *_jsonCopyl(JsonNode *node, JsonNode *root, ...) {
             }
             current = ht_find_val(current->contents.o, path->path.key);
             if(current == NULL) {
-                if(child && child->type & (JSON_ARRAY | JSON_OBJECT)) {
+                if(child && (!(JSON_ARRAY & child->type) || !(JSON_OBJECT & child->type))) {
                     new = ht_insert_copy(parent->contents.o, path->path.key, jsonCreate(NULL, child->type));
                 } else {
                     jsonLiteral null = JSON_NULL;
@@ -383,7 +383,7 @@ JsonNode *jsonCopys_recurse(JsonNode *root, struct json_path_partial *path) {
         }
         current = array_get_nth(root, path->path.index);
         while(current == NULL) {
-            if(child && child->type & (JSON_ARRAY | JSON_OBJECT)) {
+            if(child && (!(JSON_ARRAY & child->type) || !(JSON_OBJECT & child->type))) {
                 new = array_add_node(root, jsonCreate(NULL, child->type));
             } else {
                 jsonLiteral null = JSON_NULL;
@@ -407,7 +407,7 @@ JsonNode *jsonCopys_recurse(JsonNode *root, struct json_path_partial *path) {
         }
         current = ht_find_val(root->contents.o, path->path.key);
         if(current == NULL) {
-            if(child && child->type & (JSON_ARRAY | JSON_OBJECT)) {
+            if(child && (!(JSON_ARRAY & child->type) || !(JSON_OBJECT & child->type))) {
                 created = ht_insert_copy(root->contents.o, path->path.key, jsonCreate(NULL, child->type));
             } else {
                 jsonLiteral null = JSON_NULL;
@@ -530,9 +530,6 @@ int jsonOut(FILE *dest, char minify, JsonNode *root) {
 
     json_out_recurse(&out, minify, 0, root);
 
-    enqueuec(&out, '\n');
-    enqueuec(&out, '\x00');
-
     fdequeue(&out, out.pos);
 
     free(ptr);
@@ -554,20 +551,16 @@ JsonNode *jsonDeletes(JsonNode *root, JsonPath *path) {
     return jsonDelete(jsonReads(root, path));
 }
 
-int json_out_recurse(struct queue *file, char minify, int offset,
-                     JsonNode *root) {
+int json_out_recurse(struct queue *file, char minify, int offset, JsonNode *root) {
     // char mask = 0xff - (META_INVALID | META_FREE | JSON_ELEMENT);
     JsonNode *current = NULL;
-    size_t i = 0;
-
-    if (file->pos > ((file->cap - 1) / 2)) {
-        fdequeue(file, file->pos);
-        file->pos = 0;
-        file->base = 0;
-    }
+    int i = 0;
+    size_t len;
 
     switch (root->type) {
     case JSON_LITERAL:
+        queueEnsureSpace(file, strlen("false"));
+
         if (root->contents.l == JSON_NULL) {
             enqueue(file, "null", strlen("null"));
         } else if (root->contents.l == JSON_FALSE) {
@@ -582,19 +575,26 @@ int json_out_recurse(struct queue *file, char minify, int offset,
             return -3;
         }
 
+        len = strlen(root->contents.s);
+        // '"' + len + '"'
+        queueEnsureSpace(file, 1 + len + 1);
+
         enqueuec(file, '"');
         enqueue(file, root->contents.s, strlen(root->contents.s));
         enqueuec(file, '"');
         break;
 
     case JSON_NUM:
+        len = 999;
+        queueEnsureSpace(file, len);
+
         if (root->flags & JSON_NUM_IS_INT) {
             i = (int)root->contents.d;
-            snprintf(scratch.chars, 999, "%lu", i);
+            snprintf(scratch.chars, len, "%d", i);
         } else if (root->flags & JSON_NUM_IS_SCIENTIFIC) {
-            snprintf(scratch.chars, 999, "%le", root->contents.d);
+            snprintf(scratch.chars, len, "%le", root->contents.d);
         } else {
-            snprintf(scratch.chars, 999, "%lf", root->contents.d);
+            snprintf(scratch.chars, len, "%lf", root->contents.d);
         }
 
         enqueue(file, scratch.chars, strlen(scratch.chars));
@@ -604,6 +604,9 @@ int json_out_recurse(struct queue *file, char minify, int offset,
 
     case JSON_ARRAY:
         offset += 2;
+        // '[' + '\n' + offset
+        len = 1 + 1 + offset;
+        queueEnsureSpace(file, len);
 
         enqueuec(file, '[');
         if (minify == 0) {
@@ -620,6 +623,10 @@ int json_out_recurse(struct queue *file, char minify, int offset,
 
             json_out_recurse(file, minify, offset, current);
 
+            // len = ',' + '\n' + offset
+            len = 1 + 1 + offset;
+            queueEnsureSpace(file, len);
+
             current = array_get_nth(root, i++);
             if (current != NULL) {
                 enqueuec(file, ',');
@@ -631,6 +638,11 @@ int json_out_recurse(struct queue *file, char minify, int offset,
         }
 
         offset -= 2;
+
+        // len = offset + ']'
+        len = offset + 1;
+        queueEnsureSpace(file, len);
+
         if (minify == 0) {
             enqueuecn(file, ' ', offset);
         }
@@ -638,6 +650,12 @@ int json_out_recurse(struct queue *file, char minify, int offset,
         break;
 
     case JSON_OBJECT:
+        offset += 2;
+
+        // '{' + '\n' + offset
+        len = 1 + 1 + offset;
+        queueEnsureSpace(file, len);
+
         if (root->contents.o == NULL) {
             return -5;
         }
@@ -647,36 +665,6 @@ int json_out_recurse(struct queue *file, char minify, int offset,
             enqueuec(file, '\n');
         }
 
-        offset += 2;
-
-        /*
-        while (i < root->contents.o->cap && root->contents.o->count != 0) {
-            if (root->contents.o->keys[i] != NULL) {
-                if (minify == 0) {
-                    enqueuecn(file, ' ', offset);
-                }
-                enqueuec(file, '"');
-                enqueue(file, root->contents.o->keys[i]->contents.s,
-                        strlen(root->contents.o->keys[i]->contents.s));
-                enqueuec(file, '"');
-                enqueuec(file, ':');
-
-                if (minify == 0) {
-                    enqueuec(file, ' ');
-                }
-            }
-
-            current = root->contents.o->vals[i++];
-            if (current != NULL) {
-                json_out_recurse(file, minify, offset, current);
-
-                enqueuec(file, ',');
-                if (minify == 0) {
-                    enqueuec(file, '\n');
-                }
-            }
-        }
-        */
         for(JsonNode *currentKey = root->contents.o->head_key, *currentVal = root->contents.o->head_val;
                 currentKey != NULL && currentVal != NULL;
                 currentKey = currentKey->next, currentVal = currentVal->next) {
@@ -684,10 +672,15 @@ int json_out_recurse(struct queue *file, char minify, int offset,
             if (minify == 0) {
                 enqueuecn(file, ' ', offset);
             }
-            enqueuec(file, '"');
-            enqueue(file, currentKey->contents.s,
-                    strlen(currentKey->contents.s));
-            enqueuec(file, '"');
+            if(!jsonIsType(JSON_STR, currentKey)) {
+                return -3;
+            }
+            json_out_recurse(file, minify, offset, currentKey);
+
+            // len = ':' + ' '
+            len = 1 + 1;
+            queueEnsureSpace(file, len);
+
             enqueuec(file, ':');
 
             if (minify == 0) {
@@ -696,21 +689,35 @@ int json_out_recurse(struct queue *file, char minify, int offset,
 
             json_out_recurse(file, minify, offset, currentVal);
 
+            // len = ',' + '\n' + offset
+            len = 1 + 1 + offset;
+            queueEnsureSpace(file, len);
+
             enqueuec(file, ',');
             if (minify == 0) {
                 enqueuec(file, '\n');
             }
         }
 
+        // len = '\n'
+        len = 1;
+        queueEnsureSpace(file, len);
+
         if(root->contents.o->count != 0) {
             if (minify == 0) {
-                file->pos -= (2);
+                queueRedact(file, 2);
                 enqueuec(file, '\n');
             } else {
-                file->pos -= (1);
+                queueRedact(file, 1);
             }
         }
+
         offset -= 2;
+
+        // len = offset + '}'
+        len = offset + 1;
+        queueEnsureSpace(file, len);
+
         if (minify == 0) {
             enqueuecn(file, ' ', offset);
         }
@@ -1248,8 +1255,28 @@ jsonType *jsonCheckTypes(JsonNode *root, JsonPath *path) {
     return jsonCheckType(jsonReads(root, path));
 }
 
+bool jsonIsType(jsonType type, JsonNode *root) {
+    jsonType *ptr = jsonCheckType(root);
+    if(ptr == NULL) {
+        return false;
+    }
+
+    jsonType val = *ptr;
+    if(val == 0 && type == 0 && val == type) {
+        return true;
+    } else if(val & type) {
+        return true;
+    }
+
+    return false;
+}
+
+bool jsonIsTypes(jsonType type, JsonNode *root, JsonPath *keys) {
+    return jsonIsType(type, jsonReads(root, keys));
+}
+
 jsonLiteral *jsonReadLiteral(JsonNode *root) {
-    if(root == NULL || (root->type & JSON_LITERAL) == 0) {
+    if(root == NULL || !jsonIsType(JSON_LITERAL, root)) {
         return NULL;
     }
 
@@ -1261,7 +1288,7 @@ jsonLiteral *jsonReadLiterals(JsonNode *root, JsonPath *path) {
 }
 
 double *jsonReadDouble(JsonNode *root) {
-    if(root == NULL || (root->type & JSON_NUM) == 0) {
+    if(root == NULL || !jsonIsType(JSON_NUM, root)) {
         return NULL;
     }
 
@@ -1273,7 +1300,7 @@ double *jsonReadDoubles(JsonNode *root, JsonPath *path) {
 }
 
 char *jsonReadStr(JsonNode *root) {
-    if(root == NULL || (root->type & JSON_STR) == 0) {
+    if(root == NULL || !jsonIsType(JSON_STR, root)) {
         return NULL;
     }
 
@@ -1285,7 +1312,7 @@ char *jsonReadStrs(JsonNode *root, JsonPath *path) {
 }
 
 JsonNode *jsonReadArray(JsonNode *root) {
-    if(root == NULL || (root->type & JSON_ARRAY) == 0) {
+    if(root == NULL || !jsonIsType(JSON_ARRAY, root)) {
         return NULL;
     }
 
@@ -1297,7 +1324,7 @@ JsonNode *jsonReadArrays(JsonNode *root, JsonPath *path) {
 }
 
 JsonNode *jsonReadObject(JsonNode *root) {
-    if(root == NULL || (root->type & JSON_OBJECT) == 0) {
+    if(root == NULL || !jsonIsType(JSON_OBJECT, root)) {
         return NULL;
     }
 
@@ -1756,8 +1783,9 @@ void output_tests() {
     assert(fflush(out) == 0);
     rewind(out);
 
-    char *expected = "{\"A\":10,\"B\":11,\"C\":\"some text I guess\",\"D\":[{\"A\":10,\"B\":11,\"C\":12},1,\"yes\"],\"E\":false}\n";
+    char *expected = "{\"A\":10,\"B\":11,\"C\":\"some text I guess\",\"D\":[{\"A\":10,\"B\":11,\"C\":12},1,\"yes\"],\"E\":false}";
     char test[999];
+    memset(test, 0, 999);
     // Clang is unhappy about errno even though we check if it is invalid, false positive
     char *ret = fgets(test, 999, out);
     assert(ret == test);
