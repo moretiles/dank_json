@@ -86,6 +86,11 @@ jsonType *jsonCheckType(JsonNode *root);
 #define jsonCheckTypel(root, args...) jsonCheckType(jsonReadl(root, ##args NULL))
 jsonType *jsonCheckTypes(JsonNode *root, JsonPath *keys);
 
+// check type
+bool jsonIsType(jsonType type, JsonNode *root);
+#define jsonIsTypel(type, root, args...) jsonIsType(type, jsonReadl(root, ##args NULL))
+bool jsonIsTypes(jsonType type, JsonNode *root, JsonPath *keys);
+
 // read{type}
 jsonLiteral *jsonReadLiteral(JsonNode *root);
 #define jsonReadLiterall(root, args...) jsonReadLiteral(jsonReadl(root, ##args, NULL))

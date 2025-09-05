@@ -8,14 +8,7 @@
 
 #include <stdio.h>
 #include <string.h>
-
-#ifndef false
-#define false 0
-#endif
-
-#ifndef true
-#define true 1
-#endif
+#include <stdbool.h>
 
 // Make sure that MAX_BLOCK_SIZE is a multiple of 3 and 4
 #ifndef MAX_BLOCK_SIZE
@@ -31,11 +24,11 @@
 #ifndef QUEUE_STRUCT
 #define QUEUE_STRUCT 1
 typedef struct queue {
-  FILE *file;
-  char *chars;
-  int pos;
-  int base;
-  int cap;
+    FILE *file;
+    char *chars;
+    int pos;
+    int base;
+    int cap;
 } Queue;
 #endif
 
@@ -72,3 +65,9 @@ int fenqueue(Queue *store, int size);
 int fdequeue(Queue *store, int size);
 
 int queueRewind(Queue *store, int back);
+
+int queueRedact(Queue *store, int back);
+
+bool queueCanHold(Queue *queue, int size);
+
+int queueEnsureSpace(Queue *store, int max);
