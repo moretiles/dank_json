@@ -1,7 +1,8 @@
 Progress map
 
 Core functionality
-* Make it so that the head of an array keeps track of it's parent using prev so calling jsonDelete communicates to the parent properly.
+* Make it so that the head of an object keeps track of it's parent using prev
+* Make jsonDelete aware of the fact that the head node for arrays/dictionaries needs to communicate it has been deleted the parent properly. Storing the reference to the parent should already be done.
 * Use wchar_t for strings to properly handle 2 byte escapes (like \xabcd).
 * Split into public and private header
     * Define jsonLiteral JSON_TRUE, JSON_FALSE inside the private header. Mark them as extern within the public header.

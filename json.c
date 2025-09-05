@@ -540,6 +540,15 @@ int jsonOut(FILE *dest, char minify, JsonNode *root) {
 }
 
 JsonNode *jsonDelete(JsonNode *elem) {
+    if(elem->flags & JSON_ELEM_IS_HEAD && elem->prev != NULL) {
+        if(jsonIsType(JSON_ARRAY, elem->prev)) {
+            array_destroy_node(elems, elem->prev, elem);
+        } else if(jsonIsType(JSON_OBJECT, elem->prev)) {
+            // if it is the head then finding is O(1)
+            ht_del_by_val(elems, elem->prev->contents.o, elem);
+        }
+    }
+
     if(elem->flags & JSON_ELEM_IS_OPEN_FILE) {
         return ht_del_by_val(elems, openFiles, elem);
     } else {
@@ -1164,7 +1173,7 @@ JsonNode *copy_json_node(JsonNode *dest, JsonNode *src) {
         }
         memset(dest, 0, sizeof(JsonNode));
         dest->type = JSON_ARRAY;
-        orig_child = src->contents.a;
+        orig_child = array_head(src);
         while (orig_child != NULL) {
             new_child = new_node(elems);
             copy_json_node(new_child, orig_child);
@@ -1419,6 +1428,7 @@ void array_tests() {
     free(key3);
     key3 = NULL;
 
+    JsonNode *copy = NULL;
     JsonNode *new = new_node(elems);
     assert(new != NULL);
     new = copy_json_node(new, array_get_nth(array, 1));
@@ -1428,13 +1438,19 @@ void array_tests() {
     // printf("%s\n", array_get_nth(array, 5)->contents.s);
     assert(!strcmp(array_get_nth(array, 1)->contents.s,
                    array_get_nth(array, 5)->contents.s));
-    assert(array_insert_node(array, new, 2) == 0);
+    copy = new_node(elems);
+    copy = copy_json_node(copy, new);
+    assert(array_insert_node(array, copy, 2) == 0);
     assert(!strcmp(array_get_nth(array, 1)->contents.s,
                    array_get_nth(array, 2)->contents.s));
-    assert(array_insert_node(array, new, 0) == 0);
+    copy = new_node(elems);
+    copy = copy_json_node(copy, new);
+    assert(array_insert_node(array, copy, 0) == 0);
     // Add 1 because of shift up
     assert(!strcmp(array_get_nth(array, 0)->contents.s,
                    array_get_nth(array, 1 + 1)->contents.s));
+
+    array_destroy(elems, array);
 
     jsonLibEnd();
 }

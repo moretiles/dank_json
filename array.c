@@ -1,78 +1,102 @@
 #include "array.h"
 
 JsonNode *array_head(JsonNode *array) {
-    if(array == NULL || !(array->type & JSON_ARRAY) || array->contents.a == NULL) {
+    if(array == NULL || !(array->type & JSON_ARRAY)) {
         return NULL;
     }
 
-    return array->contents.a;
+    if(array->contents.a != NULL && (array->contents.a->flags & JSON_ELEM_IS_TAIL) != 0) {
+        if(array->contents.a->flags & JSON_ELEM_IS_HEAD) {
+            return array->contents.a;
+        } else if(array->contents.a->next != NULL && (array->contents.a->next->flags & JSON_ELEM_IS_HEAD) != 0) {
+            return array->contents.a->next;
+        }
+    }
+
+    return NULL;
 }
 
 JsonNode *array_tail(JsonNode *array) {
-    if(array == NULL || !(array->type & JSON_ARRAY) || array->contents.a == NULL) {
+    if(array == NULL || !(array->type & JSON_ARRAY)) {
         return NULL;
     }
 
-    if(array->contents.a->flags & JSON_ELEM_IS_TAIL) {
+    if(array->contents.a != NULL && (array->contents.a->flags & JSON_ELEM_IS_TAIL) != 0) {
         return array->contents.a;
-    } else if(array->contents.a->prev != NULL && array->contents.a->prev->flags & JSON_ELEM_IS_TAIL) {
-        return array->contents.a->prev;
-    } else {
-        return NULL;
     }
+
+    return NULL;
 }
 
+int array_update_head(JsonNode *array) {
+    if(array == NULL || !(array->type & JSON_ARRAY) || array->contents.a == NULL) {
+        return 1;
+    }
+
+    if(array->contents.a->next != NULL) {
+        array->contents.a->next->prev = array;
+        return 0;
+    } else if(array->contents.a->flags & JSON_ELEM_IS_HEAD) {
+        array->contents.a->prev = array;
+        return 0;
+    }
+
+    return 2;
+}
 
 int array_add_node(JsonNode *array, JsonNode *elem) {
-    JsonNode *head = NULL, *tail = NULL;
+    JsonNode *head = array_head(array), *tail = array_tail(array);
     if (!elem || !array || array->type != JSON_ARRAY) {
         return 1;
     }
 
-    head = array_head(array);
-    tail = array_tail(array);
-
     if (!head) {
-        array->contents.a = elem;
         elem->flags |= (JSON_ELEM_IS_HEAD | JSON_ELEM_IS_TAIL);
-        elem->prev = NULL;
+        elem->prev = array;
         elem->next = NULL;
-    } else if (head->prev == NULL || head->next == NULL) {
-        head->prev = elem;
+
+        array->contents.a = elem;
+    } else if (tail->next == NULL) {
+        head->flags &= (0xff ^ JSON_ELEM_IS_TAIL);
+        elem->flags |= JSON_ELEM_IS_TAIL;
+
         head->next = elem;
-        head->flags &= (0xff - JSON_ELEM_IS_TAIL);
         elem->prev = head;
         elem->next = head;
-        elem->flags |= JSON_ELEM_IS_TAIL;
-    } else {
-        elem->prev = tail;
-        tail->flags &= (0xff - JSON_ELEM_IS_TAIL);
-        elem->flags |= JSON_ELEM_IS_TAIL;
-        elem->next = head;
 
+        array->contents.a = elem;
+    } else {
+        tail->flags &= (0xff ^ JSON_ELEM_IS_TAIL);
+        elem->flags |= JSON_ELEM_IS_TAIL;
+
+        elem->prev = tail;
+        elem->next = head;
         tail->next = elem;
-        head->prev = elem;
+
+        array->contents.a = elem;
     }
 
     return 0;
 }
 
 int array_insert_node(JsonNode *array, JsonNode *elem, size_t pos) {
-    JsonNode *prev = NULL, *current = NULL, *next = NULL;
+    JsonNode *prev = NULL, *current = NULL, *next = NULL, *head = array_head(array), *tail = array_tail(array);
     size_t init = pos;
 
     if (!elem || !array || array->type != JSON_ARRAY) {
         return 1;
     }
 
-    if (pos == 0) {
-        if (array->contents.a == NULL) {
+    if (array->contents.a == NULL) {
+        if (pos == 0) {
             array_add_node(array, elem);
             return 0;
+        } else {
+            return -1;
         }
     }
 
-    current = array_head(array);
+    current = head;
     prev = current->prev;
     next = current->next;
 
@@ -87,58 +111,73 @@ int array_insert_node(JsonNode *array, JsonNode *elem, size_t pos) {
         pos--;
     }
 
-    elem->prev = prev;
-    elem->next = current;
+    if(current->flags & JSON_ELEM_IS_HEAD) {
+        tail->next = elem;
 
-    prev->next = elem;
-    current->prev = elem;
-
-    if (init - pos == 0) {
-        array->contents.a = elem;
-        current->flags &= 0xff - JSON_ELEM_IS_HEAD;
         elem->flags |= JSON_ELEM_IS_HEAD;
+        elem->prev = array;
+        elem->next = current;
+
+        current->prev = elem;
+        current->flags &= (0xff ^ JSON_ELEM_IS_HEAD);
+    } else {
+        elem->prev = prev;
+        elem->next = current;
+
+        prev->next = elem;
+        current->prev = elem;
     }
 
     return 0;
 }
 
 int array_destroy_node(struct json_pool *pool, JsonNode *array, JsonNode *elem) {
-    JsonNode *prev = NULL, *next = NULL;
+    JsonNode *prev = NULL, *next = NULL, *head = array_head(array), *tail = array_tail(array);
 
     /*
      * It should always be the case that if prev exists then next exists and vice
      * versa
      */
-    if (!pool || !array || !elem || array->type != JSON_ARRAY) {
+    if (!pool || !array || !elem || array->type != JSON_ARRAY || !head || !tail) {
         return 1;
     }
 
-    if (elem->prev && elem->next) {
+    if(elem->flags & JSON_ELEM_IS_HEAD) {
+        if(array != elem->prev) {
+            // something has gone terribly wrong
+            return 2;
+        }
+
+        if(head->next == NULL) {
+            array->contents.a = NULL;
+        } else {
+            next = head->next;
+
+            if(tail == next) {
+                tail->next = NULL;
+            } else {
+                tail->next = next;
+            }
+
+            next->prev = array;
+            next->flags |= JSON_ELEM_IS_HEAD;
+        }
+    } else if (elem->flags & JSON_ELEM_IS_TAIL) {
+        if(tail->prev == NULL) {
+            array->contents.a = NULL;
+        } else {
+            prev = tail->prev;
+
+            prev->next = head;
+            prev->flags |= JSON_ELEM_IS_TAIL;
+            array->contents.a = prev;
+        }
+    } else {
         prev = elem->prev;
         next = elem->next;
 
-        if (elem->flags & JSON_ELEM_IS_HEAD) {
-            next->flags |= JSON_ELEM_IS_HEAD;
-            array->contents.a = next;
-        }
         prev->next = next;
-        if (elem->flags & JSON_ELEM_IS_TAIL) {
-            prev->flags |= JSON_ELEM_IS_HEAD;
-        }
         next->prev = prev;
-    } else {
-        array->contents.a = NULL;
-    }
-
-    // special condition for when the length before deletion was 2
-    if(elem->prev != NULL && elem->next != NULL && elem->prev == elem->next) {
-        if(elem->prev != NULL) {
-            elem->prev->prev = NULL;
-        }
-
-        if(elem->next != NULL) {
-            elem->next->next = NULL;
-        }
     }
 
     elem->prev = NULL;
@@ -201,6 +240,9 @@ JsonNode *get_json_array(struct json_pool *pool, struct queue *file, struct queu
             //from_pool = new_node(elems);
             from_pool = new_node(pool);
             memcpy(from_pool, &current, sizeof(JsonNode));
+            if(from_pool->type & JSON_ARRAY && from_pool->contents.a != NULL && from_pool->contents.a->next != NULL) {
+                from_pool->contents.a->next->prev = from_pool;
+            }
             array_add_node(elem, from_pool);
             sep = get_sep(file);
         } else {
