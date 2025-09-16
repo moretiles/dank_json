@@ -17,7 +17,7 @@ DEPENDS=*.c *.h
 #                                                                     #
 #######################################################################
 release:
-	${CC} ${CFLAGS} ${OPTIMIZE} ${UNITY_BUILD} json.c -o json
+	${CC} ${CFLAGS} ${OPTIMIZE} ${UNITY_BUILD} json.c -c -o dank_json.o
 
 
 

@@ -5,7 +5,7 @@ struct json_path_partial *copy_json_path_partial(struct json_path_partial *src) 
         return NULL;
     }
 
-    struct json_path_partial *dest = calloc(sizeof(struct json_path_partial), 1);
+    struct json_path_partial *dest = calloc(1, sizeof(struct json_path_partial));
 
     if(dest == NULL) {
         return NULL;
@@ -24,7 +24,7 @@ struct json_path_partial *copy_json_path_partial(struct json_path_partial *src) 
         }
 
         size_t len = 1 + strlen(src->path.key);
-        char *ptr = calloc(sizeof(char), len);
+        char *ptr = calloc(len, sizeof(char));
         if(ptr == NULL) {
             free(dest);
             return NULL;
@@ -70,7 +70,7 @@ JsonPath *_jsonPathPush(JsonPath *path, ...) {
     va_start(args, path);
 
     if(path == NULL) {
-        path = calloc(sizeof(JsonPath), 1);
+        path = calloc(1, sizeof(JsonPath));
         if(path == NULL) {
             return NULL;
         }
