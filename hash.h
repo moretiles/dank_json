@@ -13,7 +13,7 @@ extern JsonNode *destroy_node(struct json_pool *pool, JsonNode *elem);
 // hash table funcs
 struct ht *ht_init(size_t numElems);
 uint64_t fnv(const char *data, size_t len);
-static inline uint64_t fnv_str(const char *data);
+uint64_t fnv_str(const char *data);
 JsonNode *ht_insert_copy(struct ht *table, const char *key, JsonNode *val);
 JsonNode *ht_insert_direct(struct ht *table, JsonNode *key, JsonNode *val);
 JsonNode *ht_find_key(struct ht *table, const char *key);

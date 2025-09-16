@@ -1,0 +1,27 @@
+[
+	{
+		"name": "C",
+		"compiled": true,
+		"created": 1972,
+		"variants": [
+			"C++",
+			"Objective C"
+		]
+	},
+	{
+		"name": "Python",
+		"compiled": false,
+		"created": 1989,
+		"variants": [
+			"SageMath"
+		]
+	},
+	{
+		"name": "Javascript",
+		"compiled": false,
+		"created": 1995,
+		"variants": [
+			"Typescript"
+		]
+	}
+]

@@ -2653,25 +2653,54 @@ void jsonCopy_tests() {
     jsonLibEnd();
 }
 
+void accessKey_examples() {
+    jsonLibInit();
+    JsonNode *root = jsonOpen("./examples/languages.json");
+
+    JsonNode *c = jsonReadl(root, jsonPathIndex(0));
+    char *cName = jsonReadStrl(c, jsonPathKey("name"));
+    jsonLiteral *cIsCompiled = jsonReadLiterall(c, jsonPathKey("compiled"));
+    double *cBirthYear = jsonReadDoublel(c, jsonPathKey("created"));
+    //printf("Language: %s. Compiled: %s. Birth Year: %0.lf\n", cName, (*cIsCompiled == JSON_TRUE) ? "true" : "false", *cBirthYear);
+    // Language: C. Compiled: true. Birth Year: 1972
+
+    assert(c != NULL);
+    assert(cName != NULL);
+    assert(!strcmp(cName, "C"));
+    assert(cIsCompiled != NULL);
+    assert(*cIsCompiled == JSON_TRUE);
+    assert(cBirthYear != NULL);
+    assert(*cBirthYear == 1972);
+
+    FILE *debug_out = fopen("./tmp/accessKey_examples.debug.json", "w");
+    assert(debug_out != NULL);
+    jsonOut(debug_out, 0, root);
+    assert(fclose(debug_out) == 0);
+    jsonLibEnd();
+}
+
 int main() {
+    // INternal utility testing
     read_tests();
     array_tests();
     object_tests();
     copy_tests();
     output_tests();
 
+    // JSON manipulation testing
     jsonRead_tests();
     jsonDelete_tests();
     jsonUpdate_tests();
     jsonCopy_tests();
     jsonCreate_tests();
 
+    // Provided example testing
+    accessKey_examples();
+    //deleteKey_examples();
+    //setKey_examples();
+    //appendAndSet_examples();
+
     printf("tests completed\n");
-    return 0;
-}
-#else
-int main() {
-    printf("this build does nothing\n");
     return 0;
 }
 #endif
