@@ -6,6 +6,7 @@
       "dockerfile": "Dockerfile.devenv"
     "volumes":
       - ".:/devenv"
+    # privileged is required for some sanitizer analysis, feel free to disable
     "privileged": true
     "command": "sleep 99999d"
     "working_dir": "/devenv"

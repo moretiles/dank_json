@@ -9,6 +9,6 @@
 # tmux for multiplexing
 
 FROM docker.io/archlinux/archlinux
-RUN pacman -Syyu --noconfirm clang make cmake ragel graphviz sudo ctags pwndbg binutils afl++ tmux && groupadd -g 1000 dev && useradd -u 1000 -g dev -m dev && (tee -a /etc/sudoers <<< 'dev ALL=(ALL:ALL) NOPASSWD: ALL') && (tee -a /home/dev/.gdbinit <<< 'source /usr/share/pwndbg/gdbinit.py') && (tee -a /home/dev/.gdbinit <<< 'set disassembly-flavor intel')
-USER dev
+#RUN pacman -Syyu --noconfirm clang make cmake ragel graphviz sudo ctags pwndbg binutils afl++ tmux && groupadd -g 1000 dev && useradd -u 1000 -g dev -m dev && (tee -a /etc/sudoers <<< 'dev ALL=(ALL:ALL) NOPASSWD: ALL') && (tee -a /home/dev/.gdbinit <<< 'source /usr/share/pwndbg/gdbinit.py') && (tee -a /home/dev/.gdbinit <<< 'set disassembly-flavor intel')
+RUN pacman -Syyu --noconfirm clang make cmake ragel graphviz sudo ctags pwndbg binutils afl++ tmux && (tee -a /root/.gdbinit <<< 'source /usr/share/pwndbg/gdbinit.py') && (tee -a /root/.gdbinit <<< 'set disassembly-flavor intel')
 ENV CC=clang CXX=clang++

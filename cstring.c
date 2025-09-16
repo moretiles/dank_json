@@ -6,6 +6,22 @@
 
 #ifndef _CUSTOM_CSTRING_FUNCTIONS
 #define _CUSTOM_CSTRING_FUNCTIONS 1
+
+char *cstrndup(const char *src, size_t m){
+    if(src == NULL || m == 0){
+	return NULL;
+    }
+
+    // + 1 for trailing '\x00'
+    size_t n = strlen(src) + 1;
+    if(n < m){
+        m = n;
+    }
+
+    char *dest = calloc(sizeof(char), m);
+    return cstrncpy(dest, src, m);
+}
+
 char *cstrncpy(char *dest, const char *src, size_t m) {
     size_t n = 0;
 

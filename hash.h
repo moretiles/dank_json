@@ -1,5 +1,6 @@
 #include "ds.h"
 #include "queue.h"
+#include "cstring.h"
 
 extern JsonNode *jsonCreate(const void *src, char type);
 extern JsonNode *copy_json_node(JsonNode *dest, JsonNode *src);
@@ -15,8 +16,8 @@ struct ht *ht_init(size_t numElems);
 uint64_t fnv(const char *data, size_t len);
 uint64_t fnv_str(const char *data);
 JsonNode *ht_insert_copy(struct ht *table, const char *key, JsonNode *val);
-JsonNode *ht_insert_direct(struct ht *table, JsonNode *key, JsonNode *val);
-JsonNode *ht_find_key(struct ht *table, const char *key);
+JsonNode *ht_insert_direct(struct ht *table, char *key, JsonNode *val);
+//JsonNode *ht_find_key(struct ht *table, const char *key);
 JsonNode *ht_find_val(struct ht *table, const char *key);
 JsonNode *ht_set(struct ht *table, const char *key, JsonNode *elem);
 JsonNode *ht_del(struct json_pool *pool, struct ht *table, size_t index);
