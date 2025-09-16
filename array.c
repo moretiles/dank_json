@@ -28,6 +28,25 @@ JsonNode *array_tail(JsonNode *array) {
     return NULL;
 }
 
+size_t array_length(JsonNode *array){
+	size_t size = 0;
+	JsonNode *current;
+
+	if(array != NULL && (array->type & JSON_ARRAY)){
+		current = array_head(array);
+		if(current != NULL){
+			size++;
+		}
+
+		while(current != NULL && !(current->flags & JSON_ELEM_IS_TAIL)){
+			size++;
+			current = current->next;
+		}
+	}
+
+	return size;
+}
+
 int array_update_head(JsonNode *array) {
     if(array == NULL || !(array->type & JSON_ARRAY) || array->contents.a == NULL) {
         return 1;

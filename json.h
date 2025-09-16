@@ -108,6 +108,11 @@ JsonNode *jsonReadObject(JsonNode *root);
 #define jsonReadObjectl(root, args...) jsonReadObject(jsonReadl(root, ##args, NULL))
 JsonNode *jsonReadObjects(JsonNode *root, JsonPath *path);
 
+// check array length
+size_t jsonArrayLength(JsonNode *array);
+#define jsonArrayLengthl(root, args...) jsonArrayLength(jsonReadl(root, ##args, NULL))
+size_t jsonArrayLengths(JsonNode *root, JsonPath *path);
+
 // output json structure and children as string
 int jsonOut(FILE *dest, char minify, JsonNode *elem);
 #define jsonOutl(dest, minify, root, args...)                               \
@@ -141,6 +146,7 @@ int identify(char *str, JsonNode *elem);
 static inline char get_json_literal(const char *ptr);
 char *get_json_str(struct queue *read, struct queue *scratch);
 static inline double get_json_num(char *str);
+
 JsonNode *new_node(struct json_pool *pool);
 JsonNode *copy_json_node(JsonNode *dest, JsonNode *src);
 JsonNode *copy_json_node_preserve_references(JsonNode *dest, JsonNode *src);

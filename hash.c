@@ -7,21 +7,16 @@
 
 struct ht *ht_init(size_t numElems) {
     struct ht *ret = calloc(1, sizeof(struct ht));
-    JsonNode **keys = calloc(numElems, sizeof(JsonNode *));
     JsonNode **vals = calloc(numElems, sizeof(JsonNode *));
 
-    if (ret == NULL || keys == NULL || vals == NULL) {
+    if (ret == NULL || vals == NULL) {
         free(ret);
-        free(keys);
         free(vals);
         return NULL;
     }
-    ret->keys = keys;
     ret->vals = vals;
     ret->count = 0;
     ret->cap = numElems;
-    ret->head_key = NULL;
-    ret->tail_key = NULL;
     ret->head_val = NULL;
     ret->tail_val = NULL;
 
@@ -68,10 +63,26 @@ int fnv_hash(const char *data, uint32_t *offset, uint32_t *iterate) {
 }
 
 JsonNode *ht_insert_copy(struct ht *table, const char *key, JsonNode *val) {
-    return ht_insert_direct(table, jsonCreate(key, JSON_STR), val);
+    JsonNode *node;
+
+    if(key == NULL){
+        return NULL;
+    }
+
+    char *newKey = cstrndup(key, strlen(key) + 1);
+    if(newKey == NULL){
+	    return NULL;
+    }
+
+    node = ht_insert_direct(table, newKey, val);
+    if(node == NULL){
+	    free(newKey);
+    }
+
+    return node;
 }
 
-JsonNode *ht_insert_direct(struct ht *table, JsonNode *key, JsonNode *val) {
+JsonNode *ht_insert_direct(struct ht *table, char *key, JsonNode *val) {
     if (table == NULL || key == NULL || val == NULL) {
         return NULL;
     }
@@ -81,11 +92,10 @@ JsonNode *ht_insert_direct(struct ht *table, JsonNode *key, JsonNode *val) {
 
     // find index
     {
-        fnv_hash(key->contents.s, &offset, &iterate);
+        fnv_hash(key, &offset, &iterate);
 
         size_t max_possible = table->cap;
-        while (table->keys[offset % table->cap] != NULL &&
-                table->vals[offset % table->cap] != NULL && max_possible > 0) {
+        while (table->vals[offset % table->cap] != NULL && max_possible > 0) {
             offset += iterate;
             max_possible -= 1;
         }
@@ -97,25 +107,19 @@ JsonNode *ht_insert_direct(struct ht *table, JsonNode *key, JsonNode *val) {
     // insert
     {
         table->count += 1;
-        table->keys[offset % table->cap] = key;
+
+	val->key = key;
         table->vals[offset % table->cap] = val;
     }
 
     // adjust head and prev/next
     {
-        if(table->head_key == NULL || table->head_val == NULL) {
-            key->prev = NULL;
+        if(table->head_val == NULL) {
             val->prev = NULL;
 
-            table->head_key = key;
-            table->tail_key = key;
             table->head_val = val;
             table->tail_val = val;
-        } else if(table->head_key != NULL && table->tail_val != NULL) {
-            key->prev = table->tail_key;
-            table->tail_key->next = key;
-            table->tail_key = key;
-
+        } else if(table->tail_val != NULL) {
             val->prev = table->tail_val;
             table->tail_val->next = val;
             table->tail_val = val;
@@ -131,9 +135,10 @@ JsonNode *ht_insert_direct(struct ht *table, JsonNode *key, JsonNode *val) {
             }
         }
     }
-    return ht_find_val(table, key->contents.s);
+    return ht_find_val(table, key);
 }
 
+/*
 JsonNode *ht_find_key(struct ht *table, const char *key) {
     if (table == NULL || key == NULL) {
         return NULL;
@@ -156,6 +161,7 @@ JsonNode *ht_find_key(struct ht *table, const char *key) {
     }
     return NULL;
 }
+*/
 
 JsonNode *ht_find_val(struct ht *table, const char *key) {
     if (table == NULL || key == NULL) {
@@ -168,10 +174,9 @@ JsonNode *ht_find_val(struct ht *table, const char *key) {
 
     size_t max_possible = table->cap;
     while (max_possible > 0) {
-        if (table->keys[offset % table->cap] != NULL &&
-                table->vals[offset % table->cap] != NULL &&
-                table->keys[offset % table->cap]->contents.s != NULL &&
-                !strcmp(table->keys[offset % table->cap]->contents.s, key)) {
+        if (table->vals[offset % table->cap] != NULL &&
+                table->vals[offset % table->cap]->key != NULL &&
+                !strcmp(table->vals[offset % table->cap]->key, key)) {
             return table->vals[offset % table->cap];
         }
         offset += iterate;
@@ -199,25 +204,18 @@ JsonNode *ht_del(struct json_pool *pool, struct ht *table, size_t index) {
         return NULL;
     }
 
-    if(table->head_key != NULL && table->head_val != NULL && table->tail_key != NULL && table->tail_val != NULL) {
-        if(table->keys[index] == table->head_key && table->vals[index] == table->head_val) {
-            if(table->keys[index]->next == NULL || table->vals[index]->next == NULL) {
+    if(table->head_val != NULL && table->tail_val != NULL) {
+        if(table->vals[index] == table->head_val) {
+            if(table->vals[index]->next == NULL) {
                 table->head_val = NULL;
                 table->tail_val = NULL;
-                table->head_key = NULL;
-                table->tail_key = NULL;
             } else {
-                table->keys[index]->next->prev = NULL;
                 table->vals[index]->next->prev = NULL;
-
-                table->head_key = table->keys[index]->next;
                 table->head_val = table->vals[index]->next;
             }
-        } else if(table->keys[index] == table->tail_key && table->vals[index] == table->tail_val) {
-            table->keys[index]->prev->next = NULL;
+        } else if(table->vals[index] == table->tail_val) {
             table->vals[index]->prev->next = NULL;
 
-            table->tail_key = table->keys[index]->prev;
             table->tail_val = table->vals[index]->prev;
         } else {
             if(table->vals[index]->prev == NULL) {
@@ -229,8 +227,6 @@ JsonNode *ht_del(struct json_pool *pool, struct ht *table, size_t index) {
         }
     }
 
-    destroy_node(pool, table->keys[index]);
-    table->keys[index] = NULL;
     deleted = destroy_node(pool, table->vals[index]);
     table->vals[index] = NULL;
 
@@ -249,13 +245,11 @@ JsonNode *ht_del_by_key(struct json_pool *pool, struct ht *table, const char *ke
 
     size_t max_possible = table->cap;
     while (max_possible > 0) {
-        if (table->keys[offset % table->cap] != NULL &&
-                table->vals[offset % table->cap] != NULL &&
-                table->keys[offset % table->cap]->contents.s != NULL &&
-                !strcmp(table->keys[offset % table->cap]->contents.s, key)) {
+        if (table->vals[offset % table->cap] != NULL &&
+                table->vals[offset % table->cap]->key != NULL &&
+                !strcmp(table->vals[offset % table->cap]->key, key)) {
             return ht_del(pool, table, offset % table->cap);
-        } else if (table->keys[offset % table->cap] == NULL &&
-                   table->vals[offset % table->cap] == NULL) {
+        } else if (table->vals[offset % table->cap] == NULL) {
             return NULL;
         }
         offset += iterate;
@@ -266,11 +260,11 @@ JsonNode *ht_del_by_key(struct json_pool *pool, struct ht *table, const char *ke
 }
 
 JsonNode *ht_del_by_val(struct json_pool *pool, struct ht *table, const JsonNode *val) {
-    for(JsonNode *currentKey = table->head_key, *currentVal = table->head_val;
-            currentKey != NULL && currentVal != NULL;
-            currentKey = currentKey->next, currentVal = currentVal->next) {
-        if(currentVal == val) {
-            return ht_del_by_key(pool, table, currentKey->contents.s);
+    for(JsonNode *current = table->head_val;
+            current != NULL;
+            current = current->next) {
+        if(current == val) {
+            return ht_del_by_key(pool, table, current->key);
         }
     }
 
@@ -282,27 +276,18 @@ struct ht *ht_grow(struct ht *old, size_t cap) {
         return NULL;
     }
 
-    struct ht *new = calloc(1, sizeof(struct ht));
-    JsonNode **new_keys = calloc(cap, sizeof(JsonNode *));
-    JsonNode **new_vals = calloc(cap, sizeof(JsonNode *));
-    if (new == NULL || new_keys == NULL || new_vals == NULL) {
-        free(new);
-        free(new_keys);
-        free(new_vals);
-        return NULL;
-    }
-    new->keys = new_keys;
-    new->vals = new_vals;
-    new->cap = cap;
-    for(JsonNode *currentKey = old->head_key, *currentVal = old->head_val;
-            currentKey != NULL && currentVal != NULL;
-            currentKey = currentKey->next, currentVal = currentVal->next) {
-
-        ht_insert_direct(new, currentKey, currentVal);
+    struct ht *new = ht_init(cap);
+    if(new == NULL){
+	    return NULL;
     }
 
-    free(old->keys);
-    old->keys = NULL;
+    for(JsonNode *current = old->head_val;
+            current != NULL;
+            current = current->next) {
+
+        ht_insert_direct(new, current->key, current);
+    }
+
     free(old->vals);
     old->vals = NULL;
     memcpy(old, new, sizeof(struct ht));
@@ -316,16 +301,13 @@ void ht_destroy(struct json_pool *pool, struct ht *table) {
         return;
     }
 
-    for(JsonNode *currentKey = table->head_key, *currentVal = table->head_val;
-            currentKey != NULL && currentVal != NULL;
-            currentKey = currentKey->next, currentVal = currentVal->next) {
+    for(JsonNode *current = table->head_val;
+            current != NULL;
+            current = current->next) {
 
-        destroy_node(pool, currentKey);
-        destroy_node(pool, currentVal);
+        destroy_node(pool, current);
     }
 
-    free(table->keys);
-    table->keys = NULL;
     free(table->vals);
     table->vals = NULL;
     free(table);

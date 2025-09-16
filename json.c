@@ -454,20 +454,14 @@ JsonNode *jsonUpdate(const void *src, char type, JsonNode *root) {
         return NULL;
     }
     int mask = 0xf0;
-    char *newStr = NULL;
 
     destroy_node_contents(root);
 
     switch (type) {
     case JSON_STR:
-        newStr = calloc(strlen(src) + 1, sizeof(char));
-        if(newStr == NULL) {
-            return NULL;
-        }
-        root->contents.s = newStr;
+        root->contents.s = cstrndup((char*) src, strlen((char*) src) + 1);
         root->type = type;
         root->flags &= mask;
-        cstrncpy(root->contents.s, src, strlen(src) + 1);
         break;
 
     case JSON_NUM:
@@ -547,6 +541,16 @@ JsonNode *jsonDelete(JsonNode *elem) {
             // if it is the head then finding is O(1)
             ht_del_by_val(elems, elem->prev->contents.o, elem);
         }
+    } else {
+	if(elem->prev && elem->next){
+		if(elem->prev->next == elem){
+			elem->prev->next = elem->next;
+		}
+
+		if(elem->next->prev == elem){
+			elem->next->prev = elem->prev;
+		}
+	}
     }
 
     if(elem->flags & JSON_ELEM_IS_OPEN_FILE) {
@@ -589,7 +593,7 @@ int json_out_recurse(struct queue *file, char minify, int offset, JsonNode *root
         queueEnsureSpace(file, 1 + len + 1);
 
         enqueuec(file, '"');
-        enqueue(file, root->contents.s, strlen(root->contents.s));
+        enqueue(file, root->contents.s, len);
         enqueuec(file, '"');
         break;
 
@@ -674,17 +678,25 @@ int json_out_recurse(struct queue *file, char minify, int offset, JsonNode *root
             enqueuec(file, '\n');
         }
 
-        for(JsonNode *currentKey = root->contents.o->head_key, *currentVal = root->contents.o->head_val;
-                currentKey != NULL && currentVal != NULL;
-                currentKey = currentKey->next, currentVal = currentVal->next) {
+        for(JsonNode *current = root->contents.o->head_val;
+                current != NULL;
+                current = current->next) {
 
             if (minify == 0) {
                 enqueuecn(file, ' ', offset);
             }
-            if(!jsonIsType(JSON_STR, currentKey)) {
+
+            if(current->key == NULL) {
                 return -3;
             }
-            json_out_recurse(file, minify, offset, currentKey);
+
+	    len = strlen(current->key);
+	    // '"' + len + '"'
+	    queueEnsureSpace(file, 1 + len + 1);
+
+	    enqueuec(file, '"');
+	    enqueue(file, current->key, len);
+	    enqueuec(file, '"');
 
             // len = ':' + ' '
             len = 1 + 1;
@@ -696,7 +708,7 @@ int json_out_recurse(struct queue *file, char minify, int offset, JsonNode *root
                 enqueuec(file, ' ');
             }
 
-            json_out_recurse(file, minify, offset, currentVal);
+            json_out_recurse(file, minify, offset, current);
 
             // len = ',' + '\n' + offset
             len = 1 + 1 + offset;
@@ -775,6 +787,9 @@ JsonNode *destroy_node(struct json_pool *pool, JsonNode *elem) {
         return NULL;
     }
 
+    if(elem->key != NULL){
+	    free(elem->key);
+    }
     destroy_node_contents(elem);
 
     elem->contents.n = pool->next_free;
@@ -1122,8 +1137,6 @@ JsonNode *process(struct queue *file, JsonNode *elem) {
 }
 
 JsonNode *copy_json_node(JsonNode *dest, JsonNode *src) {
-    size_t i = 0;
-    char *new_str = NULL;
     JsonNode *orig_child = NULL, *new_child = NULL;
     struct ht *table = NULL;
 
@@ -1132,36 +1145,27 @@ JsonNode *copy_json_node(JsonNode *dest, JsonNode *src) {
     }
 
     destroy_node_contents(dest);
+    memset(dest, 0, sizeof(JsonNode));
+    dest->flags = (src->flags & 0x0f);
 
     switch (src->type) {
     case JSON_LITERAL:
-        memcpy(dest, src, sizeof(JsonNode));
+	dest->contents.l = src->contents.l;
+	dest->type = JSON_LITERAL;
         break;
 
     case JSON_NUM:
         dest->contents.d = src->contents.d;
         dest->type = JSON_NUM;
-        dest->flags = src->flags;
-        dest->prev = NULL;
-        dest->next = NULL;
         break;
 
     case JSON_STR:
         if (src->contents.s == NULL) {
-            memcpy(dest, src, sizeof(JsonNode));
-            break;
-        }
-
-        new_str = calloc(1 + strlen(src->contents.s), sizeof(char));
-        if (new_str == NULL) {
             return NULL;
         }
-        cstrncpy(new_str, src->contents.s, strlen(src->contents.s) + 1);
-        dest->contents.s = new_str;
+
+        dest->contents.s = cstrndup(src->contents.s, strlen(src->contents.s) + 1);
         dest->type = JSON_STR;
-        dest->flags = src->flags;
-        dest->prev = NULL;
-        dest->next = NULL;
         break;
 
     case JSON_ARRAY:
@@ -1171,7 +1175,6 @@ JsonNode *copy_json_node(JsonNode *dest, JsonNode *src) {
         if (src->contents.a == NULL) {
             return NULL;
         }
-        memset(dest, 0, sizeof(JsonNode));
         dest->type = JSON_ARRAY;
         orig_child = array_head(src);
         while (orig_child != NULL) {
@@ -1188,26 +1191,17 @@ JsonNode *copy_json_node(JsonNode *dest, JsonNode *src) {
         break;
 
     case JSON_OBJECT:
-        if (src == NULL || src->contents.o == NULL ||
-                src->contents.o->keys == NULL || src->contents.o->vals == NULL) {
+        if (src == NULL || src->contents.o == NULL || src->contents.o->vals == NULL) {
             return NULL;
         }
 
         table = ht_init(OBJECT_STARTING_SIZE);
-        memset(dest, 0, sizeof(JsonNode));
         dest->contents.o = table;
-        dest->flags = 0;
         dest->type = JSON_OBJECT;
-        for (i = 0; i < src->contents.o->cap; i++) {
-            if (src->contents.o->keys[i] == NULL ||
-                    src->contents.o->vals[i] == NULL) {
-                continue;
-            }
-
+        for (JsonNode *current = src->contents.o->head_val; current != NULL; current = current->next) {
             new_child = new_node(elems);
-            new_str = src->contents.o->keys[i]->contents.s;
-            copy_json_node(new_child, src->contents.o->vals[i]);
-            ht_insert_copy(dest->contents.o, new_str, new_child);
+            copy_json_node(new_child, current);
+            ht_insert_copy(dest->contents.o, current->key, new_child);
         }
         break;
 
@@ -1223,6 +1217,7 @@ JsonNode *copy_json_node_preserve_references(JsonNode *dest, JsonNode *src) {
     JsonNode *orig_prev = NULL, *orig_next = NULL;
     jsonType orig_type;
     jsonFlags orig_flags;
+    char *orig_key;
 
     if (dest == NULL || src == NULL) {
         return NULL;
@@ -1232,6 +1227,12 @@ JsonNode *copy_json_node_preserve_references(JsonNode *dest, JsonNode *src) {
     orig_next = dest->next;
     orig_type = dest->type;
     orig_flags = dest->flags;
+    orig_key = NULL;
+
+    if(dest->key != NULL){
+	    orig_key = dest->key;
+	    dest->key = NULL;
+    }
 
     copy_json_node(dest, src);
 
@@ -1240,12 +1241,17 @@ JsonNode *copy_json_node_preserve_references(JsonNode *dest, JsonNode *src) {
     case META_FREE:
         dest->prev = NULL;
         dest->next = NULL;
+	dest->key = NULL;
         break;
     default:
         dest->prev = orig_prev;
         dest->next = orig_next;
         dest->flags |= (orig_flags & JSON_ELEM_IS_HEAD);
         dest->flags |= (orig_flags & JSON_ELEM_IS_TAIL);
+	if(dest->key != NULL){
+		free(dest->key);
+	}
+	dest->key = orig_key;
         break;
     }
 
@@ -1342,6 +1348,18 @@ JsonNode *jsonReadObject(JsonNode *root) {
 
 JsonNode *jsonReadObjects(JsonNode *root, JsonPath *path) {
     return jsonReadObject(jsonReads(root, path));
+}
+
+size_t jsonArrayLength(JsonNode *array){
+	if(jsonIsType(JSON_ARRAY, array)){
+		return array_length(array);
+	} else {
+		return 0;
+	}
+}
+
+size_t jsonArrayLengths(JsonNode *array, JsonPath *path){
+	return jsonArrayLength(jsonReads(array, path));
 }
 
 #if TEST_BUILD == 1
@@ -2661,8 +2679,10 @@ void accessKey_examples() {
     char *cName = jsonReadStrl(c, jsonPathKey("name"));
     jsonLiteral *cIsCompiled = jsonReadLiterall(c, jsonPathKey("compiled"));
     double *cBirthYear = jsonReadDoublel(c, jsonPathKey("created"));
+    //if(c != NULL && cName != NULL && cIsCompiled != NULL && cBirthYear != NULL){
     //printf("Language: %s. Compiled: %s. Birth Year: %0.lf\n", cName, (*cIsCompiled == JSON_TRUE) ? "true" : "false", *cBirthYear);
     // Language: C. Compiled: true. Birth Year: 1972
+    //}
 
     assert(c != NULL);
     assert(cName != NULL);
@@ -2697,9 +2717,12 @@ void accessKeyProgramatic_examples() {
 
     jsonPathPush(cPath, jsonPathKey("created"));
     double *cBirthYear = jsonReadDoubles(c, cPath);
+    jsonPathDelete(cPath);
 
+    //if(c != NULL && cName != NULL && cIsCompiled != NULL && cBirthYear != NULL){
     //printf("Language: %s. Compiled: %s. Birth Year: %0.lf\n", cName, (*cIsCompiled == JSON_TRUE) ? "true" : "false", *cBirthYear);
     // Language: C. Compiled: true. Birth Year: 1972
+    //}
 
     assert(c != NULL);
     assert(cName != NULL);
@@ -2709,7 +2732,41 @@ void accessKeyProgramatic_examples() {
     assert(cBirthYear != NULL);
     assert(*cBirthYear == 1972);
 
-    FILE *debug_out = fopen("./tmp/accessKey_examples.debug.json", "w");
+    FILE *debug_out = fopen("./tmp/accessKeyProgramatic_examples.debug.json", "w");
+    assert(debug_out != NULL);
+    jsonOut(debug_out, 0, root);
+    assert(fclose(debug_out) == 0);
+    jsonLibEnd();
+}
+
+void setDeleteAndSave_examples() {
+    jsonLibInit();
+    JsonNode *root = jsonOpen("./examples/languages.json");
+
+    JsonNode *javascript = jsonReadl(root, jsonPathIndex(2));
+    size_t arrayLength = jsonArrayLength(root);
+    JsonNode *ecmascript = jsonCopyl(javascript, root, jsonPathIndex(arrayLength));
+    //if(ecmascript == NULL){
+    //  jsonLibEnd();
+    //  return 1;
+    //}
+
+    jsonCreatel("Ecmascript", JSON_STR, ecmascript, jsonPathKey("name"));
+    jsonDeletel(ecmascript, jsonPathKey("name"));
+    jsonCreatel("Ecmascript", JSON_STR, ecmascript, jsonPathKey("name"));
+
+    // debug
+    assert(jsonReadDoublel(ecmascript, jsonPathKey("created")) != NULL);
+    assert(*jsonReadDoublel(ecmascript, jsonPathKey("created")) == 1995);
+
+    jsonOut(stdout, false, root);
+
+    assert(javascript != NULL);
+    assert(ecmascript != NULL);
+    assert(!strcmp(jsonReadStrl(javascript, jsonPathKey("name")), "Javascript"));
+    assert(!strcmp(jsonReadStrl(ecmascript, jsonPathKey("name")), "Ecmascript"));
+
+    FILE *debug_out = fopen("./tmp/setDeleteAndSave_examples.debug.json", "w");
     assert(debug_out != NULL);
     jsonOut(debug_out, 0, root);
     assert(fclose(debug_out) == 0);
@@ -2734,9 +2791,7 @@ int main() {
     // Provided example testing
     accessKey_examples();
     accessKeyProgramatic_examples();
-    //deleteKey_examples();
-    //setKey_examples();
-    //appendAndSet_examples();
+    //setDeleteAndSave_examples();
 
     printf("tests completed\n");
     return 0;

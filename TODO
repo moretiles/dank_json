@@ -1,6 +1,8 @@
 Progress map
 
 Core functionality
+* I think my best option would be to add a field to JsonNode for storing a key associated with a node. This would halve the required memory for hashtables, make the issue of deleting a value located in a hash table trivial, and simplify working with the hashtable of open files. Would still require me to modify hashtables so that the head's prev field is the node holding the hastable itself.
+
 * Make it so that the head of an object keeps track of it's parent using prev
 * Make jsonDelete aware of the fact that the head node for arrays/dictionaries needs to communicate it has been deleted the parent properly. Storing the reference to the parent should already be done.
 * Use wchar_t for strings to properly handle 2 byte escapes (like \xabcd).

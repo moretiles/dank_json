@@ -69,6 +69,7 @@ typedef struct json_node {
     jsonFlags flags;
     struct json_node *prev;
     struct json_node *next;
+    char *key;
 } JsonNode;
 
 /* Just a linked list */
@@ -109,12 +110,9 @@ struct json_pool {
 };
 
 struct ht {
-    JsonNode **keys;
     JsonNode **vals;
     size_t count;
     size_t cap;
-    JsonNode *head_key;
-    JsonNode *tail_key;
     JsonNode *head_val;
     JsonNode *tail_val;
 };

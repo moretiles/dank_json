@@ -39,6 +39,7 @@ int main(void) {
 1. jsonReadl will return a shallow copy. The family of jsonRead{type}l functions, where {type} is any supported type, return a deep copy.
 1. Before calling printf we terminate all json nodes loaded using jsonLibEnd since we no longer need them. We could have individually closed the example file with jsonClose.
 1. The comment below printf lists the output.
+1. To aid readability, error checking is not present. The return value of functions should always be checked.
 
 
 ### Load file, read keys programatically
@@ -73,8 +74,9 @@ int main(){
 ```
 
 #### Notes
-1. The output of this example is identical to the last. Using JsonPath is a requierment for most any complex behavior involving paths.
+1. The output of this example is identical to the last. Using JsonPath is more verbose for trivial cases, however, necessary for more complex path interaction.
 1. New JsonPath structs are created using jsonPathPush where the *JsonPath argument is NULL. Keys/Indexes appended as variadic arguments.
 1. jsonReads returns shallow copy of a JsonNode. JsonRead{type}s where type is any valid type returns a deep copy.
 1. jsonPathDelete deallocates a referenced jsonPath struct.
 1. jsonPathPop removes the path component at the current deepest level.
+1. To aid readability, error checking is not present. The return value of functions should always be checked.
